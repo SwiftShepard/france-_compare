@@ -262,10 +262,11 @@ export function computeRetirementUS({ brutUS, employerKey, voluntarySavings }) {
   return { employeeContribution, employerMatch, total: employeeContribution }
 }
 
-/** Voiture US : coût de possession total annualisé. */
-export function computeCarUS({ profileKey, stateKey, creditScore }) {
+/** Voiture US : coût de possession total annualisé. dtiRatePenalty = surcoût
+ *  de taux issu de la dette étudiante (effet système). */
+export function computeCarUS({ profileKey, stateKey, creditScore, dtiRatePenalty = 0 }) {
   const n = CAR.vehiclesUS[profileKey]
-  const rate = CAR.creditScoreRatesUS[creditScore]
+  const rate = CAR.creditScoreRatesUS[creditScore] + dtiRatePenalty
   const principal = CAR.vehiclePriceUS * (1 - CAR.downPaymentRateUS)
   const monthly = monthlyPayment(principal, rate, CAR.loanTermMonthsUS)
   const creditAnnualPerCar = monthly * 12
@@ -343,8 +344,8 @@ export function computeEnergyFR({ profileKey }) {
   return { kwh, elec, waterGas, total: elec + waterGas }
 }
 
-/** Logement US : crédit (taux ∝ credit score) + property tax + assurance + HOA. */
-export function computeHousingUS({ profileKey, stateKey, creditScore, climateRisk, housingMode }) {
+/** Logement US : crédit (taux ∝ credit score + DTI) + property tax + assurance + HOA. */
+export function computeHousingUS({ profileKey, stateKey, creditScore, climateRisk, housingMode, dtiRatePenalty = 0 }) {
   // housingMode : 'surface' (à surface égale) ou 'budget' (à budget égal vs FR).
   const surface = HOUSING.surfaceM2[profileKey]
   let value
@@ -358,7 +359,7 @@ export function computeHousingUS({ profileKey, stateKey, creditScore, climateRis
   }
   const surfaceObtained = value / HOUSING.pricePerM2US[stateKey]
 
-  const rate = HOUSING.mortgageBaseRateUS + HOUSING.mortgageScoreSurcharge[creditScore]
+  const rate = HOUSING.mortgageBaseRateUS + HOUSING.mortgageScoreSurcharge[creditScore] + dtiRatePenalty
   const principal = value * (1 - HOUSING.downPaymentRateUS)
   const monthly = monthlyPayment(principal, rate, HOUSING.loanTermYearsUS * 12)
   const creditAnnual = monthly * 12
@@ -399,24 +400,146 @@ export function computeFoodFR({ profileKey }) {
   return { total: FOOD.annualFR[profileKey] }
 }
 
-/** Éducation / garde. */
-export function computeEducationUS({ profileKey }) {
-  const p = PROFILES[profileKey]
-  let daycare = 0
-  if (p.kids > 0) {
-    daycare = EDUCATION.daycareUSannualPerKid * p.kids * EDUCATION.daycareKidsShare
+// ----- AXE 1 : dette étudiante de l'actif -----
+/**
+ * Solde capitalisé d'une phase d'emprunt : chaque tranche annuelle court et
+ * capitalise les intérêts (sur sa part non-subventionnée) AVANT le 1er paiement.
+ * Renvoie le solde à l'entrée en remboursement (principal gonflé).
+ */
+function capitalizedBalance({ annualBorrowed, years, rate, unsubFraction, originationFee, graceYears, payInterestDuringStudies }) {
+  let balance = 0
+  for (let k = 1; k <= years; k++) {
+    // Tranche décaissée en début d'année k → court jusqu'à l'entrée en
+    // remboursement (fin de la dernière année + grâce).
+    const yearsAccruing = (years - k + 1) + graceYears
+    const gross = annualBorrowed * (1 + originationFee)
+    const subPart = gross * (1 - unsubFraction) // intérêts payés par l'État (pas de capitalisation)
+    const accrual = payInterestDuringStudies ? 1 : Math.pow(1 + rate, yearsAccruing)
+    const unsubPart = gross * unsubFraction * accrual
+    balance += subPart + unsubPart
   }
-  const studentDebt = EDUCATION.studentDebtAppliesTo[profileKey] ? EDUCATION.studentDebtAnnualUS : 0
-  return { daycare, studentDebt, total: daycare + studentDebt }
+  return balance
 }
-export function computeEducationFR({ profileKey }) {
-  const p = PROFILES[profileKey]
-  let daycare = 0
-  if (p.kids > 0) {
-    daycare = EDUCATION.daycareFRannualPerKid * p.kids * EDUCATION.daycareKidsShare
+
+/**
+ * Dette étudiante US de l'actif. Pipeline réaliste :
+ *   CoA → coût net (après aides) → part empruntée → capitalisation des intérêts
+ *   pendant les études → amortissement sur la durée réelle (~20 ans).
+ * Appliquée PAR ADULTE actif (foyer bi-actif). Mode 'simple' : solde saisi direct.
+ */
+export function computeStudentDebtUS({ educationLevel, profileKey, debtMode, manualDebtBalance,
+  institutionType = 'publicInState', ugYears, loanType = 'mix', borrowedShareOfNet,
+  payInterestDuringStudies = false }) {
+  const sd = EDUCATION.studentDebt
+  const adults = PROFILES[profileKey].adults
+  const grace = sd.graceMonths / 12
+
+  // --- Mode simple : l'utilisateur connaît son solde de dette ---
+  if (debtMode === 'simple') {
+    const balPerAdult = Math.max(0, manualDebtBalance || 0)
+    const monthlyPerAdult = monthlyPayment(balPerAdult, sd.rateUndergrad, sd.repaymentYears * 12)
+    return {
+      mode: 'simple', stickerTotal: null, netTotal: null,
+      balance: balPerAdult * adults, monthly: monthlyPerAdult * adults,
+      annual: monthlyPerAdult * adults * 12, perAdultMonthly: monthlyPerAdult,
+      capitalizedPerAdult: balPerAdult,
+    }
   }
-  const higherEd = EDUCATION.studentDebtAppliesTo[profileKey] ? EDUCATION.higherEdFRannual : 0
-  return { daycare, higherEd, total: daycare + higherEd }
+
+  if (!educationLevel || educationLevel === 'none') {
+    return { mode: 'detailed', stickerTotal: 0, netTotal: 0, balance: 0, monthly: 0, annual: 0, perAdultMonthly: 0, capitalizedPerAdult: 0 }
+  }
+
+  const years = Math.max(1, ugYears || sd.ugYearsDefault)
+  const coaAnnual = sd.coaByInstitution[institutionType] ?? sd.coaByInstitution.publicInState
+  const netAnnual = sd.netByInstitution[institutionType] ?? sd.netByInstitution.publicInState
+  const share = borrowedShareOfNet != null ? borrowedShareOfNet : sd.borrowedShareOfNet
+  const annualBorrowedUG = netAnnual * share
+  const unsubFrac = sd.unsubFractionByLoanType[loanType] ?? sd.unsubFractionByLoanType.mix
+
+  // Phase UG (undergrad) capitalisée.
+  const ugDebt = capitalizedBalance({
+    annualBorrowed: annualBorrowedUG, years, rate: sd.rateUndergrad,
+    unsubFraction: unsubFrac, originationFee: sd.originationSubUnsub,
+    graceYears: grace, payInterestDuringStudies,
+  })
+
+  // Phase GRAD (master/doctorat) — tout non-subventionné, taux grad.
+  const gradYears = sd.gradYearsByLevel[educationLevel] || 0
+  const gradDebt = gradYears > 0 ? capitalizedBalance({
+    annualBorrowed: sd.gradAnnualBorrowed, years: gradYears, rate: sd.rateGrad,
+    unsubFraction: 1.0, originationFee: sd.originationSubUnsub,
+    graceYears: grace, payInterestDuringStudies,
+  }) : 0
+
+  const capitalizedPerAdult = ugDebt + gradDebt
+  // Amortissement séparé par phase (taux distincts) sur la durée réelle.
+  const monthlyPerAdult =
+    monthlyPayment(ugDebt, sd.rateUndergrad, sd.repaymentYears * 12) +
+    monthlyPayment(gradDebt, sd.rateGrad, sd.repaymentYears * 12)
+  const monthly = monthlyPerAdult * adults
+
+  // Sticker vs net (sur la phase UG, pour la pédagogie « ne pas confondre »).
+  const stickerTotal = coaAnnual * years * adults
+  const netTotal = netAnnual * years * adults
+
+  return {
+    mode: 'detailed',
+    stickerTotal, netTotal,
+    coaAnnual, netAnnual, ugYears: years, gradYears,
+    ugDebt: ugDebt * adults, gradDebt: gradDebt * adults,
+    capitalizedPerAdult,
+    balance: capitalizedPerAdult * adults,
+    monthly, annual: monthly * 12, perAdultMonthly: monthlyPerAdult,
+  }
+}
+
+/** Miroir FR : coût annualisé de l'éducation supérieure de l'actif (non nul). */
+export function computeStudentCostFR({ educationLevel, profileKey }) {
+  const adults = PROFILES[profileKey].adults
+  const perAdult = EDUCATION.studentDebt.annualFRByLevel[educationLevel] || 0
+  return { annual: perAdult * adults }
+}
+
+/**
+ * Pénalité de taux US issue du DTI : la mensualité étudiante dégrade la
+ * capacité d'emprunt → surcoût de taux immo & auto (effet système).
+ */
+export function computeStudentDtiPenalty({ studentMonthly, brutUS }) {
+  const grossMonthly = brutUS / 12
+  if (grossMonthly <= 0) return 0
+  const dti = studentMonthly / grossMonthly
+  const sd = EDUCATION.studentDebt.dti
+  return Math.min(sd.ratePenaltyCap, dti * sd.ratePenaltyFactor)
+}
+
+// ----- AXES 2 & 3 : enfants (scolarité + périscolaire) + AXE 1 agrégé -----
+/** Éducation / formation US (3 axes). studentDebt déjà calculé en amont. */
+export function computeEducationUS({ profileKey, stateKey, schoolChoice, extracurricularLevel, studentDebtAnnual }) {
+  const p = PROFILES[profileKey]
+  let daycare = 0, k12 = 0, extracurricular = 0
+  if (p.kids > 0) {
+    daycare = EDUCATION.daycareUSannualPerKid * EDUCATION.daycareKidsEquiv
+    const k12PerKid = (EDUCATION.k12USannualPerKid[schoolChoice] || 0) * (EDUCATION.k12StateMultiplierUS[stateKey] || 1)
+    k12 = k12PerKid * EDUCATION.k12KidsEquiv
+    extracurricular = EDUCATION.extracurricularUSByLevel[extracurricularLevel] || 0
+  }
+  const total = daycare + k12 + extracurricular + (studentDebtAnnual || 0)
+  return { daycare, k12, extracurricular, studentDebt: studentDebtAnnual || 0, total }
+}
+
+/** Éducation / formation FR (3 axes, miroir honnête). */
+export function computeEducationFR({ profileKey, schoolChoice, extracurricularLevel, educationLevel }) {
+  const p = PROFILES[profileKey]
+  let daycare = 0, k12 = 0, extracurricular = 0
+  if (p.kids > 0) {
+    daycare = EDUCATION.daycareFRannualPerKid * EDUCATION.daycareKidsEquiv
+    k12 = (EDUCATION.k12FRannualPerKid[schoolChoice] || 0) * EDUCATION.k12KidsEquiv
+    extracurricular = EDUCATION.extracurricularFRByLevel[extracurricularLevel] || 0
+  }
+  const studentCost = computeStudentCostFR({ educationLevel, profileKey }).annual
+  const total = daycare + k12 + extracurricular + studentCost
+  return { daycare, k12, extracurricular, studentCost, total }
 }
 
 /** Avantages sociaux FR valorisés en € (rémunération invisible). */
@@ -476,9 +599,29 @@ export function resolveNetAvantIRperAdult(inputs) {
 }
 
 /**
- * Cascade complète « coût employeur → brut → net avant IR → net après IR » pour
- * les deux pays, au niveau du FOYER. Sert à montrer où part l'argent à chaque
- * étage, quel que soit le mode de saisie.
+ * Taux de cotisations PATRONALES FR effectif, DÉGRESSIF (allègements généraux).
+ * Plein taux au-delà de 1,6 SMIC, allègement max au niveau du SMIC. Calculé sur
+ * le brut PAR TRAVAILLEUR (l'allègement s'apprécie par salarié).
+ */
+export function frPatronalRate(brutPerWorker) {
+  const { smicAnnualBrut: smic, cotisPatronalesMax: max,
+    cotisPatronalesReductionMax: redMax, cotisPatronalesSeuilHautSmic: seuil } = SALARY
+  const ratio = brutPerWorker / smic
+  // t = 1 au SMIC (allègement plein), 0 à `seuil` SMIC (plus d'allègement).
+  const t = Math.min(1, Math.max(0, (seuil - Math.max(1, ratio)) / (seuil - 1)))
+  return max - redMax * t
+}
+
+/**
+ * Cascade SYMÉTRIQUE « coût employeur total → brut → net avant IR → net après IR »
+ * pour les deux pays, au niveau du FOYER. On part du MÊME point haut (le coût
+ * total employeur) et on redescend les marches symétriquement.
+ *
+ * ⚠️ Symétrie clé : au stade « net avant IR », les DEUX côtés ont retiré
+ * santé + retraite + chômage — côté FR via les cotisations salariales, côté US
+ * via FICA + prime santé part salarié + cotisation 401(k) salarié. C'est ce qui
+ * rend les deux nets RÉELLEMENT comparables et révèle qu'à coût employeur égal,
+ * l'écart de net est bien plus faible que l'écart de brut affiché.
  */
 export function computeCascade(inputs, stateKey = 'TX') {
   const profileKey = inputs.profileKey
@@ -488,7 +631,9 @@ export function computeCascade(inputs, stateKey = 'TX') {
 
   // ----- FRANCE (foyer) -----
   const brutFR = householdNetAvantIR / (1 - SALARY.cotisSalarialesRate)
-  const coutEmployeurFR = brutFR * (1 + SALARY.cotisPatronalesRate)
+  const brutFRperWorker = brutFR / adults
+  const patronalRate = frPatronalRate(brutFRperWorker)
+  const coutEmployeurFR = brutFR * (1 + patronalRate)
   const irFR = computeTaxFR({ netAvantImpotFR: householdNetAvantIR, profileKey }).ir
   const netApresIRfr = householdNetAvantIR - irFR
 
@@ -502,17 +647,32 @@ export function computeCascade(inputs, stateKey = 'TX') {
   })
   const emp = EMPLOYER[inputs.employerKey]
   const planKey = emp.healthPlanQuality
-  const employerHealth = HEALTH.US.plans[planKey].employerPremiumAnnual[profileKey]
-  const employerFica = salary.brutUS * SALARY.ficaRate
-  const employerMatch = emp.has401kMatch ? salary.brutUS * emp.match401kRate : 0
-  const taxUS = computeTaxUS({ brutUS: salary.brutUS, equityUS: salary.equityUS, profileKey, stateKey })
+  const brutUSperWorker = salary.brutUS / adults
 
-  const coutEmployeurUS = salary.brutUS + salary.equityUS + employerFica + employerHealth + employerMatch
-  const netAvantIRus = salary.brutUS - salary.fica // miroir structurel (ne couvre NI santé NI retraite)
-  const netApresIRus = salary.brutUS + salary.equityUS - salary.fica - taxUS.total
+  // -- Part EMPLOYEUR (coût total) --
+  const employerFica = salary.brutUS * SALARY.ficaRate
+  const employerHealth = HEALTH.US.plans[planKey].employerPremiumAnnual[profileKey]
+  const employerUnemployment = adults *
+    (Math.min(brutUSperWorker, SALARY.usEmployerUnemploymentBase) * SALARY.usEmployerUnemploymentRate + SALARY.usFutaPerWorker)
+  const employerMatch = emp.has401kMatch ? salary.brutUS * emp.match401kRate : 0
+  const coutEmployeurUS = salary.brutUS + salary.equityUS + employerFica + employerHealth + employerUnemployment + employerMatch
+
+  // -- Part SALARIÉ retirée pour atteindre le net avant IR (miroir des cotis FR) --
+  const employeeFica = salary.fica
+  const employeeHealthPremium = HEALTH.US.plans[planKey].employeePremiumAnnual[profileKey]
+  const employee401k = computeRetirementUS({ brutUS: salary.brutUS, employerKey: inputs.employerKey, voluntarySavings: inputs.voluntarySavings }).total
+  const netAvantIRus = salary.brutUS + salary.equityUS - employeeFica - employeeHealthPremium - employee401k
+
+  const taxUS = computeTaxUS({ brutUS: salary.brutUS, equityUS: salary.equityUS, profileKey, stateKey })
+  const netApresIRus = netAvantIRus - taxUS.total
+
+  // -- Lecture « à coût employeur égal » : net en poche pour 100 d'enveloppe --
+  const frEfficiency = coutEmployeurFR > 0 ? netApresIRfr / coutEmployeurFR : 0
+  const usEfficiency = coutEmployeurUS > 0 ? netApresIRus / coutEmployeurUS : 0
 
   return {
     profileKey, stateKey, adults, netAvantIRperAdult,
+    efficiency: { fr: frEfficiency, us: usEfficiency },
     fr: {
       coutEmployeur: coutEmployeurFR,
       brut: brutFR,
@@ -520,14 +680,16 @@ export function computeCascade(inputs, stateKey = 'TX') {
       ir: irFR,
       netApresIR: netApresIRfr,
       cotisPatronales: coutEmployeurFR - brutFR,
+      patronalRate,
       cotisSalariales: brutFR - householdNetAvantIR,
     },
     us: {
       coutEmployeur: coutEmployeurUS,
       brut: salary.brutUS,
       equity: salary.equityUS,
-      employerFica, employerHealth, employerMatch,
-      fica: salary.fica,
+      employerFica, employerHealth, employerUnemployment, employerMatch,
+      fica: employeeFica,
+      employeeHealthPremium, employee401k,
       netAvantIR: netAvantIRus,
       ir: taxUS.total,
       netApresIR: netApresIRus,
@@ -581,7 +743,12 @@ export function computeSide(inputs, stateKey) {
   const energyFR = computeEnergyFR({ profileKey })
   const housingFR = computeHousingFR({ profileKey, housingMode: inputs.housingMode })
   const foodFR = computeFoodFR({ profileKey })
-  const eduFR = computeEducationFR({ profileKey })
+  const eduFR = computeEducationFR({
+    profileKey,
+    schoolChoice: inputs.schoolChoice,
+    extracurricularLevel: inputs.extracurricularLevel,
+    educationLevel: inputs.educationLevel,
+  })
   const socialBenefitsFR = computeSocialBenefitsValueFR({ brutFR: salary.brutFR, profileKey })
 
   // Revenu disponible FR = net avant impôt (foyer) − IR + transferts.
@@ -612,12 +779,27 @@ export function computeSide(inputs, stateKey) {
   const taxUS = computeTaxUS({ brutUS: salary.brutUS, equityUS: salary.equityUS, profileKey, stateKey })
   const healthUS = computeHealthUS({ profileKey, employerKey, healthScenario: inputs.healthScenario, medicalBankruptcy: inputs.medicalBankruptcy })
   const retirementUS = computeRetirementUS({ brutUS: salary.brutUS, employerKey, voluntarySavings: inputs.voluntarySavings })
-  const carUS = computeCarUS({ profileKey, stateKey, creditScore: inputs.creditScore })
+  // Dette étudiante de l'actif (AXE 1) → calculée AVANT voiture/logement car
+  // elle dégrade le DTI et renchérit ces crédits (effet système).
+  const studentDebtUS = computeStudentDebtUS({
+    educationLevel: inputs.educationLevel, profileKey,
+    debtMode: inputs.debtMode, manualDebtBalance: inputs.manualDebtBalance,
+    institutionType: inputs.institutionType, ugYears: inputs.ugYears,
+    loanType: inputs.loanType, borrowedShareOfNet: inputs.borrowedShareOfNet,
+    payInterestDuringStudies: inputs.payInterestDuringStudies,
+  })
+  const dtiRatePenalty = computeStudentDtiPenalty({ studentMonthly: studentDebtUS.monthly, brutUS: salary.brutUS })
+  const carUS = computeCarUS({ profileKey, stateKey, creditScore: inputs.creditScore, dtiRatePenalty })
   const telecomUS = computeTelecomUS({ profileKey })
   const energyUS = computeEnergyUS({ profileKey, stateKey })
-  const housingUS = computeHousingUS({ profileKey, stateKey, creditScore: inputs.creditScore, climateRisk: inputs.climateRisk, housingMode: inputs.housingMode })
+  const housingUS = computeHousingUS({ profileKey, stateKey, creditScore: inputs.creditScore, climateRisk: inputs.climateRisk, housingMode: inputs.housingMode, dtiRatePenalty })
   const foodUS = computeFoodUS({ profileKey })
-  const eduUS = computeEducationUS({ profileKey })
+  const eduUS = computeEducationUS({
+    profileKey, stateKey,
+    schoolChoice: inputs.schoolChoice,
+    extracurricularLevel: inputs.extracurricularLevel,
+    studentDebtAnnual: studentDebtUS.annual,
+  })
 
   // Revenu disponible US = brut + equity − FICA − IR(féd+État).
   const dispoUS = salary.brutUS + salary.equityUS - salary.fica - taxUS.total
@@ -663,7 +845,7 @@ export function computeSide(inputs, stateKey) {
       depensesContraintes_eur: usdToEur(depensesContraintesUS),
       resteAVivre_usd: resteAVivreUS_usd,
       resteAVivre_eur: usdToEur(resteAVivreUS_usd),
-      details: { taxUS, healthUS, retirementUS, carUS, telecomUS, energyUS, housingUS, foodUS, eduUS },
+      details: { taxUS, healthUS, retirementUS, carUS, telecomUS, energyUS, housingUS, foodUS, eduUS, studentDebtUS, dtiRatePenalty },
     },
   }
 }
@@ -789,17 +971,32 @@ export function computeRepresentativity(inputs) {
     isPepin: inputs.healthScenario === 'pepin',
   }
   const housing = { ...R.housingOwnership }
+  const hasKids = PROFILES[inputs.profileKey].kids > 0
+  const educationLevel = { ...R.educationLevel[inputs.educationLevel], key: inputs.educationLevel }
+  const institution = { ...R.institution[inputs.institutionType || 'publicInState'], key: inputs.institutionType || 'publicInState' }
+  const school = { ...R.school[inputs.schoolChoice], key: inputs.schoolChoice }
+  const extracurricular = { ...R.extracurricular[inputs.extracurricularLevel], key: inputs.extracurricularLevel }
+  // L'établissement ne compte dans le tally que si l'actif a fait des études
+  // (educationLevel ≠ none) et n'est pas en mode « solde saisi ».
+  const hasDegree = inputs.educationLevel && inputs.educationLevel !== 'none'
+  const detailedDebt = inputs.debtMode !== 'simple'
 
   // Tally global = hypothèses FAVORABLES & RARES empilées (cherry-picking),
   // dans les DEUX sens. On ne compte QUE les choix avantageux minoritaires :
   //  - un score « fair/poor » est minoritaire mais DÉSAVANTAGE les US → pas un
   //    cherry-pick (sa fréquence marginale reste affichée sur le contrôle) ;
   //  - l'assurance PPO est PILOTÉE par « grand groupe » → on ne la recompte pas
-  //    séparément pour éviter de compter deux fois le même choix.
+  //    séparément pour éviter de compter deux fois le même choix ;
+  //  - les choix éducation qui CHARGENT le côté US (diplôme avancé, privé, gros
+  //    périscolaire) sont des minorités aisées qui favorisent la thèse FR.
   const minorityItems = []
   if (employer.key === 'big') minorityItems.push({ label: 'Grand groupe', favors: 'US' })
   if (inputs.creditScore === 'excellent') minorityItems.push({ label: 'Credit score excellent', favors: 'US' })
   if (transit.active) minorityItems.push({ label: '100 % transport en commun (FR)', favors: 'FR' })
+  if (educationLevel.minority) minorityItems.push({ label: `Diplôme ${inputs.educationLevel}`, favors: 'FR' })
+  if (hasDegree && detailedDebt && institution.minority) minorityItems.push({ label: 'Établissement cher', favors: 'FR' })
+  if (hasKids && school.minority) minorityItems.push({ label: 'École privée', favors: 'FR' })
+  if (hasKids && extracurricular.minority) minorityItems.push({ label: 'Gros périscolaire', favors: 'FR' })
 
   const n = minorityItems.length
   let level, label
@@ -810,6 +1007,7 @@ export function computeRepresentativity(inputs) {
 
   return {
     employer, creditScore, healthPlan, transit, retirement401k, healthScenario, housing,
+    educationLevel, institution, school, extracurricular, hasKids,
     vehicles: R.vehicles,
     global: {
       minorityCount: n,

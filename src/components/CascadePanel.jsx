@@ -35,7 +35,8 @@ export default function CascadePanel({ inputs }) {
   return (
     <div className="panel">
       <div className="panel-head">
-        <span>Cascade du revenu — où part l'argent à chaque étage (foyer)</span>
+        <span>Cascade du revenu — coût employeur total → net en poche (foyer)</span>
+        <Info content={TOOLTIPS.coutEmployeurTotal} />
       </div>
       <div className="panel-body">
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
@@ -56,12 +57,12 @@ export default function CascadePanel({ inputs }) {
           {/* FRANCE */}
           <div>
             <div style={{ fontWeight: 700, color: FR_HEX, marginBottom: 10 }}>🇫🇷 France</div>
-            <Stage label="Coût employeur" value={c.fr.coutEmployeur} max={frMax} currency="eur" color={FR_HEX}
-              sub={`dont ${eur0(c.fr.cotisPatronales)} cotis. patronales`} />
+            <Stage label="Coût employeur total" value={c.fr.coutEmployeur} max={frMax} currency="eur" color={FR_HEX}
+              sub={`+${eur0(c.fr.cotisPatronales)} cotis. patronales (${Math.round(c.fr.patronalRate * 100)} %)`} />
             <Stage label="Brut" value={c.fr.brut} max={frMax} currency="eur" color={FR_HEX}
-              sub={`−${eur0(c.fr.cotisSalariales)} cotis. salariales`} />
+              sub={`−${eur0(c.fr.cotisSalariales)} cotis. salariales (santé/retraite/chômage)`} />
             <Stage label="Net avant IR" value={c.fr.netAvantIR} max={frMax} currency="eur" color={FR_HEX}
-              sub="santé + retraite déjà financées" />
+              sub="santé + retraite + chômage déjà financés" />
             <Stage label="Net après IR" value={c.fr.netApresIR} max={frMax} currency="eur" color="#2f6b4f"
               sub={`−${eur0(c.fr.ir)} IR (quotient familial)`} />
           </div>
@@ -69,21 +70,42 @@ export default function CascadePanel({ inputs }) {
           {/* US */}
           <div>
             <div style={{ fontWeight: 700, color: US_HEX, marginBottom: 10 }}>🇺🇸 États-Unis — {STATES[stateKey].label}</div>
-            <Stage label="Coût employeur" value={c.us.coutEmployeur} max={usMax} currency="usd" color={US_HEX}
-              sub={`+FICA empl. ${usd0(c.us.employerFica)} +santé ${usd0(c.us.employerHealth)}${c.us.employerMatch ? ` +match ${usd0(c.us.employerMatch)}` : ''}`} />
-            <Stage label={`Brut${c.us.equity ? ` (+${usd0(c.us.equity)} equity)` : ''}`} value={c.us.brut} max={usMax} currency="usd" color={US_HEX}
-              sub={`−${usd0(c.us.fica)} FICA salarié`} />
-            <Stage label={<>Net avant IR (miroir)<Info content={TOOLTIPS.miroirUS} /></>} value={c.us.netAvantIR} max={usMax} currency="usd" color={US_HEX}
-              sub="⚠️ ne couvre NI santé NI retraite" />
+            <Stage label="Coût employeur total" value={c.us.coutEmployeur} max={usMax} currency="usd" color={US_HEX}
+              sub={`+FICA ${usd0(c.us.employerFica)} +santé ${usd0(c.us.employerHealth)} +chômage ${usd0(c.us.employerUnemployment)}${c.us.employerMatch ? ` +match ${usd0(c.us.employerMatch)}` : ''}`} />
+            <Stage label={`Brut${c.us.equity ? ` (+${usd0(c.us.equity)} equity)` : ''}`} value={c.us.brut} max={usMax} currency="usd" color={US_HEX} />
+            <Stage label={<>Net avant IR<Info content={TOOLTIPS.cascadeNetAvantIR} /></>} value={c.us.netAvantIR} max={usMax} currency="usd" color={US_HEX}
+              sub={`−FICA ${usd0(c.us.fica)} −prime santé ${usd0(c.us.employeeHealthPremium)}${c.us.employee401k ? ` −401(k) ${usd0(c.us.employee401k)}` : ''}`} />
             <Stage label="Net après IR" value={c.us.netApresIR} max={usMax} currency="usd" color="#2f6b4f"
               sub={`−${usd0(c.us.ir)} IR féd.+État`} />
           </div>
         </div>
 
+        {/* Lecture « à coût employeur égal » */}
+        <div className="coutemp-egal">
+          <div className="ce-title">
+            À coût employeur égal — net en poche pour 100 d'enveloppe
+            <Info content={TOOLTIPS.coutEmployeurEgal} />
+          </div>
+          <div className="ce-bars">
+            <div className="ce-row">
+              <span className="ce-lab">🇫🇷 France</span>
+              <div className="ce-track"><div className="ce-fill" style={{ width: `${c.efficiency.fr * 100}%`, background: FR_HEX }} /></div>
+              <b className="ce-val">{Math.round(c.efficiency.fr * 100)} €</b>
+            </div>
+            <div className="ce-row">
+              <span className="ce-lab">🇺🇸 {STATES[stateKey].label}</span>
+              <div className="ce-track"><div className="ce-fill" style={{ width: `${c.efficiency.us * 100}%`, background: US_HEX }} /></div>
+              <b className="ce-val">{Math.round(c.efficiency.us * 100)} €</b>
+            </div>
+          </div>
+        </div>
+
         <div className="note-inline" style={{ marginTop: 12 }}>
-          ⚠️ Le « net avant IR » des deux pays n'est <b>pas équivalent</b>
-          <Info content={TOOLTIPS.miroirUS} /> — comparer les deux directement surestimerait
-          le pouvoir d'achat US.
+          On part du <b>même point haut</b> (coût employeur total) et on redescend symétriquement.
+          Le brut US plus élevé n'est pas de l'argent « en plus » : c'est en partie le
+          <b> transfert de la charge</b> du patronat vers le salarié (santé, retraite, chômage
+          que l'Américain devra repayer lui-même).
+          <Info content={TOOLTIPS.coutEmployeurEgal} />
         </div>
       </div>
     </div>

@@ -21,6 +21,18 @@ const DEFAULT_INPUTS = {
   voluntarySavings: false,    // cas dur : aucune épargne retraite US
   medicalBankruptcy: false,
   valueSocialBenefits: false,
+  // Éducation / formation (3 axes) — valeurs par défaut représentatives.
+  educationLevel: 'bachelor',        // diplôme de l'actif → dette étudiante US
+  // AXE 1 — paramètres de dette (défaut = public in-state, cas médian)
+  debtMode: 'detailed',              // 'detailed' (pipeline CoA→net→dette) | 'simple' (solde saisi)
+  institutionType: 'publicInState',  // community/publicInState/publicOutState/private/elite
+  ugYears: 4,                        // durée réelle d'études (4-6)
+  loanType: 'mix',                   // subsidized/mix/unsubsidized/private (fraction qui capitalise)
+  borrowedShareOfNet: 0.30,          // part du coût NET financée par emprunt
+  payInterestDuringStudies: false,   // toggle (OFF = capitalisation, cas majoritaire)
+  manualDebtBalance: 30000,          // utilisé en mode 'simple'
+  schoolChoice: 'public',            // K-12 des enfants (profil famille)
+  extracurricularLevel: 'basic',     // intensité périscolaire (profil famille)
 }
 
 export default function App() {

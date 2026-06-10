@@ -21,7 +21,13 @@ export const TOOLTIPS = {
   cadenas:
     "Verrouillé : le brut US se déduit du brut FR via le ratio poste-équivalent. Déverrouillé : vous forcez la valeur US à la main (le ratio devient une simple info).",
   miroirUS:
-    "« Net avant IR » US = brut − FICA (7,65 %) seulement. Il ne couvre NI la santé NI la retraite : ces postes sont chiffrés séparément. Le poser comme équivalent du net avant IR français surestimerait le pouvoir d'achat US.",
+    "« Net avant IR » US = brut − FICA (7,65 %) seulement. Le net US « naturel » ne couvre NI la santé NI la retraite : ces postes sont chiffrés séparément. Le poser comme équivalent du net avant IR français surestimerait le pouvoir d'achat US.",
+  coutEmployeurTotal:
+    "On part du MÊME point haut des deux côtés : le COÛT TOTAL employeur, puis on redescend symétriquement. Côté FR : brut + cotisations patronales (dégressives — fort allègement près du SMIC, ~42 % au-delà de 1,6 SMIC). Côté US : brut + FICA employeur + chômage (FUTA/SUTA) + assurance santé employeur (poste majeur) + éventuel match 401(k). Comparer le super-brut FR à un simple brut US fausserait tout.",
+  cascadeNetAvantIR:
+    "Pour rendre les deux nets RÉELLEMENT comparables, on retire santé + retraite + chômage des DEUX côtés : en FR via les cotisations salariales ; aux US via FICA + prime santé (part salarié) + cotisation 401(k) salarié. Sans ce recalage symétrique, le « net avant IR » US paraîtrait bien plus élevé qu'il ne l'est en pouvoir d'achat réel.",
+  coutEmployeurEgal:
+    "Lecture « à coût employeur égal » : pour 100 € que paie l'employeur, combien arrive net en poche de chaque côté ? Le brut US plus élevé n'est pas de l'argent « en plus » : c'est en grande partie le transfert de la charge du patronat vers le salarié. Une large part du coût employeur FR part en cotisations patronales qui PRÉ-FINANCENT ce que l'Américain devra repayer lui-même ensuite (santé, retraite, chômage). À coût employeur égal, l'écart de NET réel est bien plus faible que l'écart de BRUT affiché — le cœur de la thèse.",
 
   // --- Fiscalité ---
   fica:
@@ -91,6 +97,36 @@ export const TOOLTIPS = {
   detteEtudiante:
     "Dette étudiante US : l'université génère un remboursement annualisé qui plombe le budget des jeunes actifs sur des décennies. La fac FR est quasi gratuite (quelques centaines €/an).",
 
+  // AXE 1 — dette étudiante de l'actif
+  educationLevel:
+    "Niveau de diplôme de l'actif : il pilote la durée d'études et donc la dette US (remboursée sur ~20 ans). Le poste « tech » à haut salaire arrive typiquement AVEC un diplôme avancé, donc une dette élevée : le salaire attractif vient avec son passif. Appliqué par adulte actif. Miroir FR non nul (vie étudiante, écoles privées).",
+  coaNetDebt:
+    "3 grandeurs à NE PAS confondre : (1) le COÛT AFFICHÉ (CoA = tuition + fees + logement) ; (2) le COÛT NET après bourses/aides ; (3) la DETTE réellement empruntée (la part du net financée par emprunt — le reste vient du job, de la famille, de l'épargne). La dette de sortie d'un bachelor public (~27-30 k$) est BIEN inférieure au sticker 4 ans (>100 k$).",
+  institutionType:
+    "Type d'établissement → coût annuel (CoA et net 2025-26) : community ~21 320 $ ; public in-state ~30 990 $ (net ~20 800) ; out-of-state ~50 000 $ ; privé ~50 920 $ ; élite 77 500-98 300 $. L'élite, très subventionnée, peut coûter NET moins cher que le privé intermédiaire pour les familles modestes. La dette la plus toxique : privé non-élite et out-of-state (cher + peu d'aide, sans le prestige qui ouvre les hauts salaires).",
+  loanType:
+    "Type de prêt dominant → fraction des intérêts qui CAPITALISE pendant les études. Subventionné : l'État paie les intérêts pendant la scolarité (pas de capitalisation). Non-subventionné / PLUS / privé : les intérêts courent dès le décaissement et s'ajoutent au principal à l'entrée en remboursement (intérêt sur intérêt). Défaut « mix » = majoritairement non-subventionné. Taux fixes 2025-26 : undergrad 6,39 %, grad 7,94 %, PLUS 8,94 %.",
+  ugYears:
+    "Durée RÉELLE des études undergrad : seulement ~42 % diplôment en 4 ans. Chaque année supplémentaire ajoute un emprunt ET prolonge la phase d'accumulation d'intérêts.",
+  borrowedShareOfNet:
+    "Part du coût NET financée par EMPRUNT (le reste : job étudiant, apport familial, épargne). Tout n'est jamais emprunté : c'est pourquoi la dette de sortie est bien inférieure au coût net total.",
+  payInterestDuringStudies:
+    "Payer les intérêts pendant les études (même ~25 $/mois) empêche leur capitalisation et réduit fortement le solde final. OFF par défaut car c'est le cas minoritaire — la plupart laissent capitaliser.",
+  debtMode:
+    "Mode détaillé : la dette se reconstruit depuis le cursus (établissement, durée, prêt, aides). Mode simple : entrez directement un solde de dette connu, amorti sur ~20 ans.",
+  studentDebtDti:
+    "Effet système : la mensualité étudiante entre dans le debt-to-income (DTI) US et dégrade la capacité d'emprunt immo/auto, renchérissant leur taux. Contexte 2025 : reprise des recouvrements sur prêts en défaut (saisie sur salaire), ~24 % d'emprunteurs en retard de paiement.",
+
+  // AXE 2 — scolarité des enfants
+  schoolChoice:
+    "K-12 des enfants. US public ≈ gratuit MAIS qualité corrélée à la valeur immobilière du quartier (bon school district = logement plus cher). US privé : religieux ~8 500 $, moyenne ~15 000 $, indépendant ~30 000 $/an/enfant (jusqu'à 49 000 $) — soit ~195 000 $ à ~640 000 $ sur 13 ans. FR : public gratuit, privé sous contrat très abordable (quelques centaines à ~2 200 €/an).",
+  kindergartenCliff:
+    "« Kindergarten cliff » : aux US le coût de garde 0-5 ans est très élevé (~10 000-20 000 $/an/enfant) puis chute à quasi-zéro à l'entrée en école publique. En FR, crèche/assistante maternelle subventionnée (reste à charge modéré).",
+
+  // AXE 3 — périscolaire
+  extracurricular:
+    "Activités extrascolaires (sport compétitif, musique, tutoring, summer camps, « travel teams »). Aux US : très cher, quasi pas subventionné. En FR : clubs municipaux, conservatoires, centres de loisirs, aides CAF → coût bien plus faible à activité équivalente. Un gros budget périscolaire décrit un foyer aisé, pas la médiane.",
+
   // --- Conversion / lectures ---
   ppa:
     "PPA (parité de pouvoir d'achat) : convertit non pas au taux de change de marché mais selon ce qu'une somme achète réellement. Le dollar « achète » moins que le change ne le suggère, car le niveau des prix US est plus élevé.",
@@ -117,5 +153,5 @@ export const POSTE_TIPS = {
   energie: "Volume différencié (US supérieur : grande maison, clim, chauffage élec) × prix du kWh par État. Le kWh moins cher est en partie mangé par le volume consommé.",
   logement: "Mode propriétaire. US : crédit (taux ∝ credit score) + property tax + assurance (± risque climatique) + HOA. FR : crédit à taux fixe + taxe foncière douce + assurance dérisoire.",
   alimentation: "Comparaison à QUALITÉ CONSTANTE : panier FR courant valorisé côté US au niveau Whole Foods / organic. Double effet : prix nominal US plus élevé + prime qualité. Choix méthodo assumé.",
-  education: "Garde jeune enfant (crèche FR subventionnée vs daycare US plein tarif) + dette étudiante US annualisée (fac FR quasi gratuite).",
+  education: "Poste majeur, 3 axes : (1) dette étudiante de l'actif (US ~20 ans de remboursement, miroir FR non nul) ; (2) scolarité des enfants — garde 0-5 ans (kindergarten cliff) + K-12 public/privé ; (3) périscolaire (sport, musique, tutoring, camps). Massivement auto-financé aux US, socialisé en FR.",
 }

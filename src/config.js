@@ -100,8 +100,21 @@ export const SALARY = {
   // groupe paie davantage et ajoute de l'equity — voir EMPLOYER).
 
   // Cotisations PATRONALES FR (part employeur), pour la cascade « coût employeur
-  // → brut ». ~42 % du brut (ordre de grandeur, cadres comme non-cadres mêlés).
-  cotisPatronalesRate: 0.42,
+  // → brut ». PAS un taux plat : forte dégressivité via les allègements généraux
+  // (réduction « Fillon ») près du SMIC, dégressifs jusqu'à 1,6 SMIC.
+  //   - plein taux ~42 % au-delà de 1,6 SMIC ;
+  //   - au niveau du SMIC, l'allègement ramène l'effectif à ~10 %.
+  cotisPatronalesMax: 0.42,        // plein taux (haut salaire)
+  cotisPatronalesReductionMax: 0.32, // allègement max au niveau du SMIC
+  smicAnnualBrut: 21621,           // SMIC brut annuel ~2025 (1 801,80 €/mois ×12)
+  cotisPatronalesSeuilHautSmic: 1.6, // au-delà : plus d'allègement, plein taux
+
+  // Part EMPLOYEUR chômage US (FUTA + SUTA), pour le coût employeur total US.
+  // Faible, sur une base de salaire basse (≠ FICA). FUTA 0,6 % sur 7 000 $ ;
+  // SUTA variable ~2,7 % sur une base ~10 000-15 000 $ → quelques centaines $.
+  usEmployerUnemploymentRate: 0.027, // SUTA moyen
+  usEmployerUnemploymentBase: 12000, // base imposable moyenne (par travailleur)
+  usFutaPerWorker: 42,               // 0,6 % × 7 000 $
 }
 
 // ---------------------------------------------------------------------------
@@ -480,26 +493,108 @@ export const FOOD = {
 }
 
 // ---------------------------------------------------------------------------
-//  ÉDUCATION / GARDE D'ENFANTS — deux sous-blocs actifs
+//  ÉDUCATION / FORMATION — poste MAJEUR, 3 axes
+//   AXE 1 : dette étudiante de l'ACTIF (tous profils)
+//   AXE 2 : scolarité des enfants par étage (profil famille)
+//   AXE 3 : périscolaire / activités extrascolaires
+//  Aux US : massivement auto-financé. En FR : massivement socialisé.
+//  SOURCES (2025-2026) commentées par bloc ; tout est ajustable.
 // ---------------------------------------------------------------------------
 export const EDUCATION = {
-  // Garde jeune enfant (concerne le profil famille).
-  // FR : crèche/assistante maternelle fortement subventionnée (CMG CAF +
-  // crédit d'impôt). Reste à charge annuel par enfant en bas âge.
-  daycareFRannualPerKid: 3000,   // reste à charge après aides
-  // US : daycare plein tarif non aidé (peut atteindre un quasi-salaire).
-  daycareUSannualPerKid: 14000,  // USD, plein tarif
-  // Part des 2 enfants encore en âge de garde (amortissement sur la durée).
-  daycareKidsShare: 0.5, // en moyenne 1 des 2 enfants en garde payante
 
-  // Éducation supérieure → DETTE ÉTUDIANTE.
-  // FR : fac quasi gratuite (quelques centaines €/an).
-  higherEdFRannual: 250, // par jeune en études
-  // US : université → remboursement de dette étudiante annualisé sur des
-  // décennies (poids majeur des jeunes actifs).
-  studentDebtAnnualUS: 3300, // USD/an de remboursement (annualisé)
-  // Concerne surtout célibataire/couple jeunes actifs (dette en cours).
-  studentDebtAppliesTo: { single: true, couple: true, family: false },
+  // ===== AXE 1 — DETTE ÉTUDIANTE DE L'ACTIF =================================
+  // Paramètre du PROFIL ACTIF (pas projeté sur les enfants). Appliqué par adulte
+  // actif (foyer bi-actif → chaque adulte porte son diplôme/sa dette).
+  //
+  // ⚠️ 3 grandeurs à NE JAMAIS confondre :
+  //   1. CoA (coût d'attendance) = tuition+fees+room&board affiché.
+  //   2. Coût NET = CoA − aides/bourses (ce qui reste à financer).
+  //   3. Dette empruntée = la PART du net financée par emprunt (le reste : job,
+  //      famille, épargne). La dette de sortie d'un bachelor public (~27-30 k$)
+  //      est très inférieure au CoA 4 ans (>100 k$). Le modèle part du net ×
+  //      part empruntée, PAS du sticker.
+  studentDebt: {
+    // --- Coûts ANNUELS par type d'établissement (USD, 2025-26) ---
+    // CoA = sticker affiché ; net = après aides moyennes.
+    coaByInstitution: {
+      community: 21320,       // tuition ~4 150
+      publicInState: 30990,   // tuition ~11 950 (6 360 FL → 18 000 VT/NH)
+      publicOutState: 50000,  // tuition ~31 880
+      private: 50920,         // tuition ~45 000
+      elite: 87000,           // 77 500–98 300 (tuition 59 000–71 000)
+    },
+    netByInstitution: {
+      community: 13000,
+      publicInState: 20800,   // coût net moyen public
+      publicOutState: 33000,
+      private: 36200,         // coût net moyen privé
+      elite: 28000,           // élite TRÈS subventionnée (Stanford net ~37,6 k ;
+                              // Harvard ~17,9 k pour bénéficiaires) → net < privé
+                              // intermédiaire pour les familles éligibles.
+    },
+    // Part du coût NET financée par EMPRUNT (reste : job/famille/épargne).
+    // Calibrée pour que public in-state 4 ans → ~29 k$ de dette de sortie.
+    borrowedShareOfNet: 0.30,
+
+    // --- Durée ---
+    ugYearsDefault: 4,  // bachelor nominal ; ajustable 4-6 (~42 % diplôment en 4 ans)
+    gradYearsByLevel: { none: 0, bachelor: 0, master: 2, doctorate: 5 }, // empilé sur l'UG
+    gradAnnualBorrowed: 13000, // emprunt annuel phase grad (tout non-subventionné)
+
+    // --- Taux fixes fédéraux 2025-26 ---
+    rateUndergrad: 0.0639,
+    rateGrad: 0.0794,
+    ratePlus: 0.0894,
+    // Frais d'origination (ajoutés au principal).
+    originationSubUnsub: 0.01057,
+    originationPlus: 0.04228,
+
+    // --- Type de prêt dominant (UG) → fraction NON-subventionnée qui CAPITALISE
+    //     les intérêts pendant les études. Sub = l'État paie les intérêts. ---
+    unsubFractionByLoanType: { subsidized: 0.0, mix: 0.7, unsubsidized: 1.0, private: 1.0 },
+
+    // --- Remboursement ---
+    repaymentYears: 20,  // durée RÉELLE moyenne (et non 10)
+    graceMonths: 6,      // grâce avant 1er paiement (intérêts continuent de courir)
+
+    // FR (miroir HONNÊTE, pas zéro) : public quasi gratuit MAIS vie étudiante +
+    // prêts d'écoles privées (commerce/ingé). Pas de capitalisation côté public FR.
+    annualFRByLevel: { none: 0, bachelor: 300, master: 1200, doctorate: 600 },
+
+    // Effet SYSTÈME — la mensualité étudiante entre dans le debt-to-income (DTI)
+    // US et dégrade la capacité/le taux d'emprunt immo & auto.
+    dti: {
+      ratePenaltyFactor: 0.06, // pénalité de taux ∝ (mensualité étudiante / revenu)
+      ratePenaltyCap: 0.012,   // plafond +1,2 pt de taux
+    },
+  },
+
+  // ===== AXE 2 — SCOLARITÉ DES ENFANTS (profil famille) =====================
+  // Garde petite enfance 0-5 ans (« kindergarten cliff » : coût élevé concentré
+  // sur 0-5 ans puis quasi-zéro à l'entrée en école publique).
+  daycareUSannualPerKid: 14000,  // USD plein tarif non aidé (10 000-20 000 $)
+  daycareFRannualPerKid: 3000,   // EUR reste à charge après CMG CAF + crédit d'impôt
+  // Équivalents-enfants en bas âge (snapshot lifecycle d'une famille 2 enfants).
+  daycareKidsEquiv: 0.6,
+
+  // K-12 (primaire/middle/high). Choix public/privé en paramètre.
+  k12KidsEquiv: 1.4, // équivalents-enfants en âge scolaire K-12
+  // US : public quasi gratuit (corrélé à la valeur immo du quartier — bon
+  // school district = logement plus cher, lien signalé sans double comptage).
+  // Privé paramétrable, USD/an/enfant : religieux ~8 500, moyenne ~15 000,
+  // indépendant haut de gamme ~30 000 (jusqu'à 49 000). CA plus cher.
+  k12USannualPerKid: { public: 0, privateReligious: 8500, privateAverage: 15000, privateIndependent: 30000 },
+  k12StateMultiplierUS: { TX: 0.85, NC: 0.9, CA: 1.2 }, // CA ~18 000 $/an moyenne
+  // FR : public gratuit (réel), privé sous contrat très abordable.
+  k12FRannualPerKid: { public: 0, privateReligious: 900, privateAverage: 1500, privateIndependent: 2200 },
+
+  // ===== AXE 3 — PÉRISCOLAIRE / EXTRASCOLAIRE (profil famille) ==============
+  // Sport compétitif, musique, tutoring, summer camps, « travel teams ».
+  // US : très cher, quasi pas subventionné. FR : clubs municipaux,
+  // conservatoires, centres de loisirs, aides CAF → coût bien plus faible à
+  // activité équivalente (mantra qualité/prix). Par foyer (2 enfants).
+  extracurricularUSByLevel: { basic: 1200, invested: 9000 }, // USD/an/foyer
+  extracurricularFRByLevel: { basic: 400, invested: 1500 },  // EUR/an/foyer
 }
 
 // ---------------------------------------------------------------------------
@@ -587,6 +682,45 @@ export const REPRESENTATIVITY = {
   // Nombre de véhicules (non modifiable ici, mais représentativité indicative).
   vehicles: {
     note: 'Hypothèse : 1 véhicule par adulte côté US (dépendance auto quasi généralisée), plus souple côté FR (un couple partage souvent une voiture).',
+  },
+
+  // Niveau de diplôme de l'actif (pilote la dette étudiante US).
+  // Parts indicatives sur la population active US. Un diplôme avancé = dette
+  // plus lourde : choisir master/doctorat décrit une minorité ET charge le
+  // côté US (favorable à la thèse FR) → à signaler.
+  educationLevel: {
+    none: { share: 0.45, minority: false, note: "Sans diplôme du supérieur : ~45 % des actifs US. Pas de dette étudiante (mais salaire généralement plus bas)." },
+    bachelor: { share: 0.35, minority: false, note: "Bachelor : la voie diplômante la plus courante. Dette ~30 000 $, ~222 $/mois sur 20 ans." },
+    master: { share: 0.15, minority: true, note: "Master : ~15 % des actifs. Dette moyenne ~58 570 $. Charge le côté US (favorable à la thèse FR)." },
+    doctorate: { share: 0.05, minority: true, note: "Doctorat / diplôme pro : ~5 % des actifs, dette lourde (62 770–212 430 $). Le haut salaire « tech » arrive AVEC ce passif. Cas minoritaire." },
+  },
+
+  // Type d'établissement (UG). Le public in-state est la voie majoritaire et la
+  // moins endettante. La « horror story » n'est NI l'élite (sur-subventionnée
+  // pour les modestes) NI le public in-state, mais le PRIVÉ NON-ÉLITE et
+  // l'OUT-OF-STATE : cher + peu d'aide, sans le prestige qui ouvre les hauts salaires.
+  institution: {
+    community: { share: 0.10, minority: false, note: "Community college (~21 320 $/an) : option la moins chère, souvent 2 ans puis transfert. Dette faible." },
+    publicInState: { share: 0.55, minority: false, note: "Public in-state : voie majoritaire. Net ~20 800 $/an, dette de sortie médiane ~27-30 k$ (≠ le sticker 4 ans >100 k$)." },
+    publicOutState: { share: 0.12, minority: true, note: "Public out-of-state : tuition ~3× l'in-state, faible aide. Profil de dette TOXIQUE (cher sans le prestige élite)." },
+    private: { share: 0.20, minority: true, note: "Privé non lucratif ~50 920 $/an affiché. Le privé NON-élite intermédiaire = dette lourde, dotation modeste donc peu d'aide." },
+    elite: { share: 0.03, minority: true, note: "Élite (~77 500-98 300 $/an affichés) MAIS aide très généreuse (Stanford net ~37,6 k, Harvard ~17,9 k pour bénéficiaires). Le plein tarif n'est payé que par les familles aisées non éligibles." },
+  },
+
+  // Choix d'école K-12 (profil famille). La majorité des enfants US sont en
+  // public ; le privé (surtout indépendant) est un choix de foyer aisé,
+  // minoritaire, qui charge le côté US.
+  school: {
+    public: { share: 0.90, minority: false, note: "École publique : ~90 % des enfants US (et la quasi-totalité en FR). Gratuit, mais aux US la qualité est corrélée à la valeur immobilière du quartier." },
+    privateReligious: { share: 0.07, minority: true, note: "Privé religieux US ~8 500 $/an/enfant. Minoritaire." },
+    privateAverage: { share: 0.07, minority: true, note: "Privé US tous types ~15 000 $/an/enfant. Sur 13 ans ≈ 195 000 $/enfant. Choix aisé minoritaire." },
+    privateIndependent: { share: 0.02, minority: true, note: "Privé indépendant haut de gamme ~30 000 $/an (jusqu'à 49 000 $), ≈ 640 000 $ sur 13 ans. ~2 % des enfants : minorité dans la minorité." },
+  },
+
+  // Intensité du périscolaire (profil famille).
+  extracurricular: {
+    basic: { share: 0.70, minority: false, note: "Périscolaire de base (club, activité accessible)." },
+    invested: { share: 0.20, minority: true, note: "Gros budget périscolaire (sport compétitif, travel teams, tutoring, summer camps) : décrit un foyer aisé, pas la médiane. Aux US ces activités sont quasi non subventionnées." },
   },
 }
 

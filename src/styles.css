@@ -146,6 +146,26 @@ input:focus { outline: 2px solid var(--fr); outline-offset: -1px; }
 
 input[type="range"] { width: 100%; accent-color: var(--fr); }
 
+.ctrl-select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+}
+.ctrl-select:focus { outline: 2px solid var(--fr); outline-offset: -1px; }
+
+.adv-details { margin-top: 10px; border-top: 1px dashed var(--line-strong); padding-top: 6px; }
+.adv-details > summary {
+  cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--ink-soft);
+  text-transform: uppercase; letter-spacing: .03em; padding: 2px 0; outline-offset: 2px;
+}
+.adv-details > summary:focus-visible { outline: 2px solid var(--fr); border-radius: 3px; }
+.adv-details label { text-transform: none; letter-spacing: normal; font-size: 11.5px; }
+
 .toggle-row {
   display: flex;
   align-items: center;
@@ -241,6 +261,22 @@ table.postes tfoot td { border-top: 2px solid var(--ink); font-weight:700; }
 table.postes .fr-col { color: var(--fr); }
 table.postes .us-col { color: var(--us); }
 .cell-flag { font-size: 11px; color: var(--ink-faint); }
+
+/* ---- Cascade : lecture « à coût employeur égal » ---- */
+.coutemp-egal {
+  margin-top: 16px; padding: 12px 14px; border-radius: var(--radius);
+  background: #fbfcfd; border: 1px solid var(--line);
+}
+.coutemp-egal .ce-title {
+  font-size: 12px; font-weight: 700; color: var(--ink-soft);
+  text-transform: uppercase; letter-spacing: .03em; margin-bottom: 10px;
+}
+.coutemp-egal .ce-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.coutemp-egal .ce-row:last-child { margin-bottom: 0; }
+.coutemp-egal .ce-lab { flex: 0 0 92px; font-size: 12.5px; }
+.coutemp-egal .ce-track { flex: 1; height: 16px; background: #eef1f4; border-radius: 4px; overflow: hidden; }
+.coutemp-egal .ce-fill { height: 100%; border-radius: 4px; transition: width .2s; }
+.coutemp-egal .ce-val { flex: 0 0 46px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
 
 /* ---- Sections ---- */
 .section { margin-top: 26px; }

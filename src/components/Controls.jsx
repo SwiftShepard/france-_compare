@@ -37,6 +37,15 @@ function Toggle({ label, tip, checked, onChange }) {
   )
 }
 
+// Liste déroulante native (compacte, accessible) pour les choix à 4-5 options.
+function Select({ value, onChange, options }) {
+  return (
+    <select className="ctrl-select" value={value} onChange={(e) => onChange(e.target.value)}>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  )
+}
+
 export default function Controls({ inputs, set }) {
   const adults = PROFILES[inputs.profileKey].adults
   // Net avant IR résolu (per-adulte) quel que soit le mode de saisie.
@@ -242,6 +251,149 @@ export default function Controls({ inputs, set }) {
             />
             <RepBadge alea note={rep.housing.note} text="propriétaire : FR ~58 % · TX ~62 % · NC ~66 % · CA ~55 %" />
           </div>
+
+          {/* ÉDUCATION / FORMATION — AXE 1 : dette étudiante de l'actif */}
+          <div className="field">
+            <label>
+              Diplôme de l'actif — dette étudiante
+              <Info content={TOOLTIPS.educationLevel} />
+              <Info content={TOOLTIPS.studentDebtDti} />
+            </label>
+            <Seg compact
+              value={inputs.educationLevel}
+              onChange={(v) => set({ educationLevel: v })}
+              options={[
+                { value: 'none', label: 'Aucun' },
+                { value: 'bachelor', label: 'Bachelor' },
+                { value: 'master', label: 'Master' },
+                { value: 'doctorate', label: 'Doct./pro' },
+              ]}
+            />
+            <RepBadge share={rep.educationLevel.share} minority={rep.educationLevel.minority} note={rep.educationLevel.note} />
+          </div>
+
+          {inputs.educationLevel !== 'none' && (
+            <div className="field">
+              <label>
+                Études — coût & dette
+                <Info content={TOOLTIPS.coaNetDebt} />
+                <Info content={TOOLTIPS.debtMode} />
+              </label>
+              <Seg compact
+                value={inputs.debtMode}
+                onChange={(v) => set({ debtMode: v })}
+                options={[
+                  { value: 'detailed', label: 'Cursus détaillé' },
+                  { value: 'simple', label: 'Solde connu' },
+                ]}
+              />
+              {inputs.debtMode === 'simple' ? (
+                <div style={{ marginTop: 8 }}>
+                  <input type="number" step="1000" value={inputs.manualDebtBalance}
+                    onChange={(e) => set({ manualDebtBalance: Number(e.target.value) || 0 })} />
+                  <div className="hint">Solde de dette connu ($/adulte), amorti sur 20 ans.</div>
+                </div>
+              ) : (
+                <div style={{ marginTop: 8 }}>
+                  <label style={{ marginBottom: 4 }}>
+                    Établissement <Info content={TOOLTIPS.institutionType} />
+                  </label>
+                  <Select
+                    value={inputs.institutionType}
+                    onChange={(v) => set({ institutionType: v })}
+                    options={[
+                      { value: 'community', label: 'Community college (~21 320 $)' },
+                      { value: 'publicInState', label: 'Public in-state (~30 990 $)' },
+                      { value: 'publicOutState', label: 'Public out-of-state (~50 000 $)' },
+                      { value: 'private', label: 'Privé non lucratif (~50 920 $)' },
+                      { value: 'elite', label: 'Élite (77 500-98 300 $)' },
+                    ]}
+                  />
+                  <RepBadge share={rep.institution.share} minority={rep.institution.minority} note={rep.institution.note} />
+
+                  <details className="adv-details">
+                    <summary>Paramètres de dette avancés</summary>
+                    <div style={{ marginTop: 8 }}>
+                      <label style={{ marginBottom: 4 }}>
+                        Type de prêt dominant <Info content={TOOLTIPS.loanType} />
+                      </label>
+                      <Select
+                        value={inputs.loanType}
+                        onChange={(v) => set({ loanType: v })}
+                        options={[
+                          { value: 'subsidized', label: 'Subventionné (État paie les intérêts)' },
+                          { value: 'mix', label: 'Mix (majorité non-subventionné)' },
+                          { value: 'unsubsidized', label: 'Non-subventionné' },
+                          { value: 'private', label: 'Privé' },
+                        ]}
+                      />
+                    </div>
+                    <div style={{ marginTop: 10 }}>
+                      <label style={{ marginBottom: 2 }}>
+                        Durée réelle d'études : {inputs.ugYears} ans <Info content={TOOLTIPS.ugYears} />
+                      </label>
+                      <input type="range" min="4" max="6" step="1" value={inputs.ugYears}
+                        onChange={(e) => set({ ugYears: Number(e.target.value) })} />
+                    </div>
+                    <div style={{ marginTop: 10 }}>
+                      <label style={{ marginBottom: 2 }}>
+                        Part empruntée du coût net : {Math.round(inputs.borrowedShareOfNet * 100)} % <Info content={TOOLTIPS.borrowedShareOfNet} />
+                      </label>
+                      <input type="range" min="0" max="1" step="0.05" value={inputs.borrowedShareOfNet}
+                        onChange={(e) => set({ borrowedShareOfNet: Number(e.target.value) })} />
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <Toggle
+                        label="Payer les intérêts pendant les études"
+                        tip={TOOLTIPS.payInterestDuringStudies}
+                        checked={inputs.payInterestDuringStudies}
+                        onChange={(v) => set({ payInterestDuringStudies: v })}
+                      />
+                    </div>
+                  </details>
+                </div>
+              )}
+            </div>
+          )}
+
+          {inputs.profileKey === 'family' && (
+            <>
+              <div className="field">
+                <label>
+                  École des enfants (K-12)
+                  <Info content={TOOLTIPS.schoolChoice} />
+                  <Info content={TOOLTIPS.kindergartenCliff} />
+                </label>
+                <Seg compact
+                  value={inputs.schoolChoice}
+                  onChange={(v) => set({ schoolChoice: v })}
+                  options={[
+                    { value: 'public', label: 'Public' },
+                    { value: 'privateReligious', label: 'Privé relig.' },
+                    { value: 'privateAverage', label: 'Privé moy.' },
+                    { value: 'privateIndependent', label: 'Privé indép.' },
+                  ]}
+                />
+                <RepBadge share={rep.school.share} minority={rep.school.minority} note={rep.school.note} />
+              </div>
+
+              <div className="field">
+                <label>
+                  Périscolaire / activités
+                  <Info content={TOOLTIPS.extracurricular} />
+                </label>
+                <Seg
+                  value={inputs.extracurricularLevel}
+                  onChange={(v) => set({ extracurricularLevel: v })}
+                  options={[
+                    { value: 'basic', label: 'De base' },
+                    { value: 'invested', label: 'Gros budget' },
+                  ]}
+                />
+                <RepBadge share={rep.extracurricular.share} minority={rep.extracurricular.minority} note={rep.extracurricular.note} />
+              </div>
+            </>
+          )}
 
           <div className="field" style={{ marginBottom: 4 }}>
             <label>Options</label>

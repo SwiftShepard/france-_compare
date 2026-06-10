@@ -232,10 +232,24 @@ function ZoomDetails({ data, stateKey }) {
           <span>Property tax US<Info content={TOOLTIPS.propertyTax} /> : <b>{usd0(us.housingUS.propertyTax)}</b></span>
           <span>Taxe foncière FR : <b>{eur0(fr.housingFR.taxeFonciere)}</b></span>
         </div>
-        <div className="kpi-strip">
+        <div className="kpi-strip" style={{ marginBottom: 10 }}>
           <span>Retraite US à financer : <b>{usd0(us.retirementUS.total)}</b>{us.retirementUS.employerMatch > 0 ? <> (match employeur {usd0(us.retirementUS.employerMatch)})</> : ' (0 par défaut — retraite dégradée)'}</span>
           <span>Avantages sociaux FR valorisés<Info content={TOOLTIPS.congesValorises} /> : <b>{eur0(sb.value)}</b> ({sb.jours} j payés)</span>
         </div>
+        {us.studentDebtUS.balance > 0 && (
+          <div className="kpi-strip">
+            <span className="warn">Dette étudiante US<Info content={TOOLTIPS.coaNetDebt} /> : solde <b>{usd0(us.studentDebtUS.balance)}</b> → <b>{usd0(us.studentDebtUS.annual)}</b>/an{us.dtiRatePenalty > 0 ? <> · DTI<Info content={TOOLTIPS.studentDebtDti} /> +{(us.dtiRatePenalty * 100).toFixed(2)} pt sur crédits</> : null}</span>
+            {us.studentDebtUS.stickerTotal != null && (
+              <span className="muted">Coût affiché<Info content={TOOLTIPS.coaNetDebt} /> {usd0(us.studentDebtUS.stickerTotal)} → net {usd0(us.studentDebtUS.netTotal)} → dette {usd0(us.studentDebtUS.balance)}</span>
+            )}
+          </div>
+        )}
+        {(us.eduUS.k12 > 0 || us.eduUS.daycare > 0) && (
+          <div className="kpi-strip">
+            {us.eduUS.k12 > 0 && <span>Scolarité K-12 US : <b>{usd0(us.eduUS.k12)}</b>/an{us.eduUS.extracurricular > 0 ? <> · périscolaire <b>{usd0(us.eduUS.extracurricular)}</b></> : null}</span>}
+            {us.eduUS.daycare > 0 && <span>Garde 0-5 ans US<Info content={TOOLTIPS.kindergartenCliff} /> : <b>{usd0(us.eduUS.daycare)}</b> vs FR <b>{eur0(fr.eduFR.daycare)}</b></span>}
+          </div>
+        )}
       </div>
     </div>
   )
