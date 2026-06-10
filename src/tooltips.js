@@ -103,3 +103,19 @@ export const TOOLTIPS = {
   foyerBiactif:
     "Hypothèse foyer : chaque adulte actif perçoit le salaire de référence (foyer bi-actif pour un couple). Revenu du foyer = référence × nombre d'adultes. Pour un foyer mono-actif, diviser la saisie par deux.",
 }
+
+/**
+ * Tooltips par POSTE de dépense (hypothèse retenue + ce qui est inclus).
+ * Affichés en infobulle à côté du libellé de chaque poste.
+ */
+export const POSTE_TIPS = {
+  impots: "FR : IR progressif au quotient familial (les cotisations sont déjà hors du net avant IR). US : IR fédéral + impôt d'État + FICA. Inclut aussi la fiscalité indirecte (sales tax / TVA, property tax / taxe foncière).",
+  sante: "Coût santé TOTAL annuel = primes/cotisations + reste à charge attendu sur l'année (franchise, coinsurance, dentaire/optique). On ne compare pas la seule prime US à la seule mutuelle FR.",
+  retraite: "FR : retraite pré-financée par les cotisations (non recomptée). US : épargne volontaire nécessaire pour égaler la couverture FR. Par défaut 0 (cas dur) sauf match employeur ou épargne activée.",
+  voiture: "Coût de possession TOTAL annualisé : crédit (taux ∝ credit score), assurance, entretien, carburant, dépréciation/negative equity. US : 1 véhicule par adulte. Option transport en commun côté FR.",
+  telecom: "Prix pour SERVICE équivalent au forfait FR (multi-lignes illimité + fibre), mobile facturé par ligne côté US, frais cachés US inclus (taxes, location d'équipement, broadcast fees).",
+  energie: "Volume différencié (US supérieur : grande maison, clim, chauffage élec) × prix du kWh par État. Le kWh moins cher est en partie mangé par le volume consommé.",
+  logement: "Mode propriétaire. US : crédit (taux ∝ credit score) + property tax + assurance (± risque climatique) + HOA. FR : crédit à taux fixe + taxe foncière douce + assurance dérisoire.",
+  alimentation: "Comparaison à QUALITÉ CONSTANTE : panier FR courant valorisé côté US au niveau Whole Foods / organic. Double effet : prix nominal US plus élevé + prime qualité. Choix méthodo assumé.",
+  education: "Garde jeune enfant (crèche FR subventionnée vs daycare US plein tarif) + dette étudiante US annualisée (fac FR quasi gratuite).",
+}

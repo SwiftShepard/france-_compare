@@ -7,6 +7,8 @@ import { eur0, usd0, num0 } from '../format.js'
 import BreakEven from './BreakEven.jsx'
 import CascadePanel from './CascadePanel.jsx'
 import RepBanner from './RepBanner.jsx'
+import Info from './Info.jsx'
+import { TOOLTIPS, POSTE_TIPS } from '../tooltips.js'
 
 const STATE_COLORS = { TX: 'var(--tx)', NC: 'var(--nc)', CA: 'var(--ca)' }
 const STATE_HEX = { TX: '#c08a2d', NC: '#4a7a8c', CA: '#8a4a8c' }
@@ -29,13 +31,13 @@ function TripleReading({ data, stateKey }) {
     {
       t: '2 · Parité de pouvoir d\'achat',
       v: eur0(ppa),
-      d: `Même revenu vu en pouvoir d'achat réel (PPA OCDE). Le dollar « achète » moins que le change ne le suggère.`,
+      d: TOOLTIPS.ppa,
       fr: fr.dispo,
     },
     {
       t: '3 · Reste à vivre net ★',
       v: eur0(us.resteAVivre_eur),
-      d: `Après TOUTES les dépenses contraintes (santé, retraite, voiture, logement…). La lecture reine.`,
+      d: TOOLTIPS.resteAVivre,
       fr: fr.resteAVivre,
     },
   ]
@@ -47,7 +49,7 @@ function TripleReading({ data, stateKey }) {
         const gap = usVal - c.fr
         return (
           <div className="read" key={c.t}>
-            <div className="rt">{c.t}</div>
+            <div className="rt">{c.t}<Info content={c.d} /></div>
             <div className="rv">{c.v}</div>
             <div className="rd" style={{ marginTop: 6 }}>
               FR : <b>{eur0(c.fr)}</b> · écart US−FR :{' '}
@@ -55,7 +57,6 @@ function TripleReading({ data, stateKey }) {
                 {gap >= 0 ? '+' : ''}{eur0(gap)}
               </b>
             </div>
-            <div className="rd">{c.d}</div>
           </div>
         )
       })}
@@ -113,7 +114,10 @@ function PostesChart({ data }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">Détail poste par poste — coût annuel (€, US converti au change)</div>
+      <div className="panel-head">
+        <span>Détail poste par poste — coût annuel (€, US converti au change)</span>
+        <Info content="Impôts = IR (FR) vs IR fédéral + État + FICA (US). Santé US = primes + reste à charge attendu. Retraite = épargne nécessaire (0 par défaut en lambda sans épargne)." />
+      </div>
       <div className="panel-body">
         <div className="legend">
           <span><span className="dot" style={{ background: FR_HEX }} />France</span>
@@ -139,10 +143,6 @@ function PostesChart({ data }) {
             <Bar dataKey="CA" name="Californie" fill={STATE_HEX.CA} radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-        <div className="note-inline">
-          Impôts = IR (FR) vs IR fédéral + État + FICA (US). Santé US = primes + reste à
-          charge attendu. Retraite = épargne nécessaire (0 par défaut en lambda sans épargne).
-        </div>
       </div>
     </div>
   )
@@ -180,7 +180,7 @@ function PostesTable({ data, stateKey }) {
               const gap = r.us - r.fr
               return (
                 <tr key={r.key}>
-                  <td>{r.label}</td>
+                  <td>{r.label}{POSTE_TIPS[r.key] && <Info content={POSTE_TIPS[r.key]} />}</td>
                   <td className="fr-col">{eur0(r.fr)}</td>
                   <td className="us-col">{eur0(r.us)}</td>
                   <td style={{ color: gap > 0 ? 'var(--us)' : gap < 0 ? 'var(--fr)' : 'inherit' }}>
@@ -214,10 +214,13 @@ function ZoomDetails({ data, stateKey }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">Zoom — ce que cachent les postes ({STATES[stateKey].label})</div>
+      <div className="panel-head">
+        <span>Zoom — ce que cachent les postes ({STATES[stateKey].label})</span>
+        <Info content="Le credit score US pilote le taux du prêt auto ET immo (il n'existe pas en France). La negative equity auto, les HOA et les frais cachés télécoms sont intégrés mais rarement chiffrés." />
+      </div>
       <div className="panel-body">
         <div className="kpi-strip" style={{ marginBottom: 10 }}>
-          <span>Crédit auto US (TAEG) : <b>{(us.carUS.rate * 100).toFixed(2)} %</b> · {us.carUS.vehicles} véhicule(s)</span>
+          <span>Crédit auto US (TAEG)<Info content={TOOLTIPS.creditScore} /> : <b>{(us.carUS.rate * 100).toFixed(2)} %</b> · {us.carUS.vehicles} véhicule(s)<Info content={TOOLTIPS.negativeEquity} /></span>
           <span>Crédit immo US (taux) : <b>{(us.housingUS.rate * 100).toFixed(2)} %</b></span>
           <span>Surface logement : <b>{num0(us.housingUS.surface)} m²</b></span>
         </div>
@@ -225,18 +228,13 @@ function ZoomDetails({ data, stateKey }) {
           <span className="warn">Santé US : prime <b>{usd0(us.healthUS.premium)}</b> + reste à charge <b>{usd0(us.healthUS.oop)}</b> + dentaire/optique <b>{usd0(us.healthUS.dentalVision)}</b>{us.healthUS.bankruptcy ? <> + dette médicale <b>{usd0(us.healthUS.bankruptcy)}</b></> : null}</span>
         </div>
         <div className="kpi-strip" style={{ marginBottom: 10 }}>
-          <span>Santé FR : mutuelle <b>{eur0(fr.healthFR.mutuelle)}</b> + reste à charge <b>{eur0(fr.healthFR.resteACharge)}</b></span>
-          <span>Property tax US : <b>{usd0(us.housingUS.propertyTax)}</b></span>
+          <span>Santé FR : mutuelle<Info content={TOOLTIPS.mutuelle} /> <b>{eur0(fr.healthFR.mutuelle)}</b> + reste à charge <b>{eur0(fr.healthFR.resteACharge)}</b></span>
+          <span>Property tax US<Info content={TOOLTIPS.propertyTax} /> : <b>{usd0(us.housingUS.propertyTax)}</b></span>
           <span>Taxe foncière FR : <b>{eur0(fr.housingFR.taxeFonciere)}</b></span>
         </div>
         <div className="kpi-strip">
           <span>Retraite US à financer : <b>{usd0(us.retirementUS.total)}</b>{us.retirementUS.employerMatch > 0 ? <> (match employeur {usd0(us.retirementUS.employerMatch)})</> : ' (0 par défaut — retraite dégradée)'}</span>
-          <span>Avantages sociaux FR valorisés : <b>{eur0(sb.value)}</b> ({sb.jours} j payés)</span>
-        </div>
-        <div className="note-inline">
-          Le crédit score US pilote le taux du prêt auto et immo (effet pédagogique fort :
-          il n'existe pas en France). La <b>negative equity</b> auto et les <b>HOA</b> /
-          frais cachés télécoms sont intégrés mais rarement chiffrés.
+          <span>Avantages sociaux FR valorisés<Info content={TOOLTIPS.congesValorises} /> : <b>{eur0(sb.value)}</b> ({sb.jours} j payés)</span>
         </div>
       </div>
     </div>

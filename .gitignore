@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output (généré par la CI, pas versionné)
+dist/
+
+# Logs & divers
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.local
+.DS_Store
+.vite/

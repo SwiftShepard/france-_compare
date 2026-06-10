@@ -6,6 +6,8 @@ import {
 import { computeBreakEven } from '../model.js'
 import { PROFILES, STATES } from '../config.js'
 import { eur0, usd0 } from '../format.js'
+import Info from './Info.jsx'
+import { TOOLTIPS } from '../tooltips.js'
 
 const FR_HEX = '#1f4e79'
 const US_HEX = '#9c2b2b'
@@ -50,6 +52,7 @@ export default function BreakEven({ inputs }) {
     <div className="panel">
       <div className="panel-head">
         <span>Seuil de bascule — à partir de quel revenu les US deviennent-ils avantageux ?</span>
+        <Info content={TOOLTIPS.seuilBascule} />
       </div>
       <div className="panel-body">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>

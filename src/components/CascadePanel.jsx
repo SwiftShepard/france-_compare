@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { computeCascade } from '../model.js'
 import { STATES, PROFILES } from '../config.js'
 import { eur0, usd0 } from '../format.js'
+import Info from './Info.jsx'
+import { TOOLTIPS } from '../tooltips.js'
 
 const FR_HEX = '#1f4e79'
 const US_HEX = '#9c2b2b'
@@ -71,7 +73,7 @@ export default function CascadePanel({ inputs }) {
               sub={`+FICA empl. ${usd0(c.us.employerFica)} +santé ${usd0(c.us.employerHealth)}${c.us.employerMatch ? ` +match ${usd0(c.us.employerMatch)}` : ''}`} />
             <Stage label={`Brut${c.us.equity ? ` (+${usd0(c.us.equity)} equity)` : ''}`} value={c.us.brut} max={usMax} currency="usd" color={US_HEX}
               sub={`−${usd0(c.us.fica)} FICA salarié`} />
-            <Stage label="Net avant IR (miroir)" value={c.us.netAvantIR} max={usMax} currency="usd" color={US_HEX}
+            <Stage label={<>Net avant IR (miroir)<Info content={TOOLTIPS.miroirUS} /></>} value={c.us.netAvantIR} max={usMax} currency="usd" color={US_HEX}
               sub="⚠️ ne couvre NI santé NI retraite" />
             <Stage label="Net après IR" value={c.us.netApresIR} max={usMax} currency="usd" color="#2f6b4f"
               sub={`−${usd0(c.us.ir)} IR féd.+État`} />
@@ -79,10 +81,9 @@ export default function CascadePanel({ inputs }) {
         </div>
 
         <div className="note-inline" style={{ marginTop: 12 }}>
-          ⚠️ Le « net avant IR » des deux pays n'est <b>pas équivalent</b> : côté FR il intègre
-          déjà santé, retraite et chômage ; côté US il n'a subi que la FICA et laisse santé et
-          retraite à la charge du salarié (chiffrées en postes séparés). Comparer les deux
-          directement surestimerait le pouvoir d'achat US.
+          ⚠️ Le « net avant IR » des deux pays n'est <b>pas équivalent</b>
+          <Info content={TOOLTIPS.miroirUS} /> — comparer les deux directement surestimerait
+          le pouvoir d'achat US.
         </div>
       </div>
     </div>

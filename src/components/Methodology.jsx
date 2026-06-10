@@ -15,6 +15,8 @@ export default function Methodology() {
           cette thèse honnêtement : chaque hypothèse qui lui est favorable est ajustable.
         </div>
 
+        <details className="methodo-details">
+        <summary>Principes méthodologiques détaillés (qualité constante, piège du net, lectures…)</summary>
         <p><strong>1. Comparaison à qualité constante.</strong> On ne compare pas des prix
         faciaux mais le coût d'un <strong>même niveau de service</strong>. Un panier
         alimentaire FR courant (marque lambda à bio Leclerc) est valorisé côté US au niveau
@@ -55,6 +57,7 @@ export default function Methodology() {
           Garde-fou : la force de l'argument vient de sa robustesse au paramétrage, pas d'un
           cadrage figé. Les chiffres sont des hypothèses discutables, assumées comme telles.
         </p>
+        </details>
       </div>
     </div>
   )
