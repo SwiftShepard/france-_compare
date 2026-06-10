@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
 } from 'recharts'
-import { STATES, POSTE_LABELS, CONVERSION } from '../config.js'
+import { STATES, FR_REGIONS, REGION_PAIRS, POSTE_LABELS, CONVERSION } from '../config.js'
 import { eur0, usd0, num0 } from '../format.js'
 import BreakEven from './BreakEven.jsx'
 import CascadePanel from './CascadePanel.jsx'
@@ -64,28 +64,28 @@ function TripleReading({ data, stateKey }) {
   )
 }
 
-/* ----- Cartes verdict par État ----- */
+/* ----- Cartes verdict APPARIÉES par niveau (région FR ↔ État US) ----- */
 function VerdictGrid({ data }) {
-  const fr = data.fr
   return (
     <div className="verdict-grid">
-      {['TX', 'NC', 'CA'].map((sk) => {
-        const us = data.states[sk]
-        const frRav = fr.resteAVivre
+      {REGION_PAIRS.map((pair) => {
+        const region = FR_REGIONS[pair.region]
+        const us = data.states[pair.state]
+        const frRav = data.frRegions[pair.region].resteAVivre
         const usRav = us.resteAVivre_eur
         const delta = usRav - frRav
         const frWins = delta < 0
-        const total = Math.max(1, Math.abs(frRav) + Math.abs(usRav))
         const frPct = (Math.max(0, frRav) / (Math.max(0, frRav) + Math.max(0, usRav) || 1)) * 100
         return (
-          <div className="verdict-card" key={sk}>
-            <div className="state-name">{STATES[sk].label}</div>
-            <div className="state-tag">{STATES[sk].tagline}</div>
+          <div className="verdict-card" key={pair.region}>
+            <div className="state-tag" style={{ marginBottom: 2, fontWeight: 600 }}>Niveau {pair.label.toLowerCase()}</div>
+            <div className="state-name" style={{ fontSize: 14 }}>{region.label} <span className="muted">vs</span> {STATES[pair.state].label}</div>
+            <div className="state-tag">{region.tagline} ↔ {STATES[pair.state].tagline}</div>
             <div className="rav-line">
-              <span>Reste à vivre 🇫🇷</span><b>{eur0(frRav)}</b>
+              <span>Reste à vivre 🇫🇷 {region.label}</span><b>{eur0(frRav)}</b>
             </div>
             <div className="rav-line">
-              <span>Reste à vivre 🇺🇸</span><b>{eur0(usRav)}</b>
+              <span>Reste à vivre 🇺🇸 {STATES[pair.state].label}</span><b>{eur0(usRav)}</b>
             </div>
             <div className="bar-mini">
               <div className="fr-seg" style={{ width: `${frPct}%` }} />
@@ -104,6 +104,7 @@ function VerdictGrid({ data }) {
 
 /* ----- Graphe poste par poste (Recharts) ----- */
 function PostesChart({ data }) {
+  const frLabel = FR_REGIONS[data.fr.regionKey].label
   const rows = Object.keys(POSTE_LABELS).map((key) => ({
     poste: POSTE_LABELS[key],
     FR: Math.round(data.fr.postes[key]),
@@ -120,7 +121,7 @@ function PostesChart({ data }) {
       </div>
       <div className="panel-body">
         <div className="legend">
-          <span><span className="dot" style={{ background: FR_HEX }} />France</span>
+          <span><span className="dot" style={{ background: FR_HEX }} />{frLabel}</span>
           <span><span className="dot" style={{ background: STATE_HEX.TX }} />Texas</span>
           <span><span className="dot" style={{ background: STATE_HEX.NC }} />Caroline du Nord</span>
           <span><span className="dot" style={{ background: STATE_HEX.CA }} />Californie</span>
@@ -137,7 +138,7 @@ function PostesChart({ data }) {
               contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #cbd3dd' }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="FR" name="France" fill={FR_HEX} radius={[2, 2, 0, 0]} />
+            <Bar dataKey="FR" name={frLabel} fill={FR_HEX} radius={[2, 2, 0, 0]} />
             <Bar dataKey="TX" name="Texas" fill={STATE_HEX.TX} radius={[2, 2, 0, 0]} />
             <Bar dataKey="NC" name="Caroline du Nord" fill={STATE_HEX.NC} radius={[2, 2, 0, 0]} />
             <Bar dataKey="CA" name="Californie" fill={STATE_HEX.CA} radius={[2, 2, 0, 0]} />
@@ -160,17 +161,22 @@ function PostesTable({ data, stateKey }) {
   const frTotal = rows.reduce((s, r) => s + r.fr, 0)
   const usTotal = rows.reduce((s, r) => s + r.us, 0)
 
+  const frLabel = FR_REGIONS[data.fr.regionKey].label
+  const paired = FR_REGIONS[data.fr.regionKey].pairUS === stateKey
   return (
     <div className="panel">
       <div className="panel-head">
-        <span>Tableau comparatif — France vs {STATES[stateKey].label}</span>
+        <span>Tableau comparatif — {frLabel} vs {STATES[stateKey].label}</span>
+        <span className={`pill ${paired ? '' : 'warn'}`} style={{ fontSize: 10 }}>
+          {paired ? '✓ appariée par niveau' : 'comparaison non appariée'}
+        </span>
       </div>
       <div className="panel-body" style={{ overflowX: 'auto' }}>
         <table className="postes">
           <thead>
             <tr>
               <th>Poste</th>
-              <th className="fr-col">France (€)</th>
+              <th className="fr-col">{frLabel} (€)</th>
               <th className="us-col">{STATES[stateKey].label} (€)</th>
               <th>Écart</th>
             </tr>
@@ -272,10 +278,12 @@ export default function Results({ data, inputs }) {
       </div>
 
       <div className="section">
-        <h2>Synthèse — reste à vivre par État</h2>
+        <h2>Synthèse — comparaison appariée par niveau de coût <Info content={TOOLTIPS.appariement} /></h2>
         <div className="section-sub">
-          Verdict €/an après toutes dépenses contraintes, pour le profil et les paramètres
-          choisis. Le « reste à vivre » est ce qui demeure réellement disponible.
+          Verdict €/an après toutes dépenses contraintes. Chaque carte compare une <b>région FR
+          à l'État US de même niveau</b> (Bretagne↔Texas, métropole↔Caroline du Nord,
+          Île-de-France↔Californie). C'est la lecture honnête : on ne compare pas la Bretagne à
+          la Californie. Les sections ci-dessous suivent la région choisie à gauche.
         </div>
         <VerdictGrid data={data} />
       </div>

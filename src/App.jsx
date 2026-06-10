@@ -8,6 +8,7 @@ import { SALARY } from './config.js'
 const DEFAULT_INPUTS = {
   netAvantImpotFR: SALARY.defaultNetAvantImpotFR, // valeur saisie (sens dépend de inputMode)
   inputMode: 'avantIR',       // 'avantIR' (net avant IR) | 'apresIR' (net après IR)
+  frRegion: 'bretagne',       // région FR : bretagne (low) / metropole (mid) / idf (high)
   profileKey: 'single',
   employerKey: 'lambda',      // cas dur par défaut, fidèle à la thèse
   ratio: SALARY.posteEquivalentRatio,

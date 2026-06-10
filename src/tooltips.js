@@ -135,6 +135,12 @@ export const TOOLTIPS = {
   seuilBascule:
     "Seuil de bascule : niveau de revenu à partir duquel le reste à vivre US dépasse celui de la FR. Obtenu en balayant le salaire et en recalculant le modèle complet à chaque point. Il se déplace avec tous les paramètres.",
 
+  // --- Géographie ---
+  frRegion:
+    "La France n'est pas uniforme. On compare TROIS territoires FR de niveaux de coût différents à TROIS États US, appariés par niveau : Bretagne (province modérée) ↔ Texas ; métropole régionale (Lyon/Nantes/Toulouse) ↔ Caroline du Nord ; Île-de-France/Paris ↔ Californie. Opposer la Bretagne à la Californie serait aussi biaisé que comparer le Texas à Paris. Ce qui change selon la région : logement (surtout), transport, voiture, énergie, alimentation. Ce qui NE change PAS : l'impôt sur le revenu et les cotisations — la fiscalité FR est NATIONALE (alors que l'income tax US varie par État) : une asymétrie réelle, assumée.",
+  appariement:
+    "Appariement recommandé par niveau de coût : low FR (Bretagne) vs low US (Texas), mid vs mid, high vs high. C'est la lecture honnête — on compare des territoires de niveau de vie comparable. Le croisement libre reste possible (ex. « et si je quitte la Bretagne pour la Californie ? »).",
+
   // --- Hypothèse foyer ---
   foyerBiactif:
     "Hypothèse foyer : chaque adulte actif perçoit le salaire de référence (foyer bi-actif pour un couple). Revenu du foyer = référence × nombre d'adultes. Pour un foyer mono-actif, diviser la saisie par deux.",

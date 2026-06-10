@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { computeBreakEven } from '../model.js'
-import { PROFILES, STATES } from '../config.js'
+import { PROFILES, STATES, FR_REGIONS } from '../config.js'
 import { eur0, usd0 } from '../format.js'
 import Info from './Info.jsx'
 import { TOOLTIPS } from '../tooltips.js'
@@ -74,6 +74,15 @@ export default function BreakEven({ inputs }) {
             <button className={mode === 'A' ? 'active' : ''} onClick={() => setMode('A')}>Deux courbes</button>
             <button className={mode === 'B' ? 'active' : ''} onClick={() => setMode('B')}>Différentiel</button>
           </div>
+        </div>
+
+        <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--ink-soft)' }}>
+          France : <b>{FR_REGIONS[inputs.frRegion].label}</b> (sélectionnée à gauche)
+          {FR_REGIONS[inputs.frRegion].pairUS === stateKey
+            ? <span className="pill" style={{ marginLeft: 8, fontSize: 10 }}>✓ appariée par niveau</span>
+            : <button className="link-btn" style={{ marginLeft: 8 }} onClick={() => setStateKey(FR_REGIONS[inputs.frRegion].pairUS)}>
+                apparier ({STATES[FR_REGIONS[inputs.frRegion].pairUS].label})
+              </button>}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 250px', gap: 16, alignItems: 'stretch' }}>

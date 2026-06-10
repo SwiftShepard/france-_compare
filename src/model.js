@@ -16,8 +16,13 @@
 import {
   CONVERSION, PROFILES, SALARY, EMPLOYER, TAX_FR, TAX_US_FEDERAL, TAX_US_STATE,
   TRANSFERS_FR, SOCIAL_BENEFITS_FR, HEALTH, RETIREMENT, CAR, TELECOM, ENERGY,
-  HOUSING, FOOD, EDUCATION, REPRESENTATIVITY,
+  HOUSING, FOOD, EDUCATION, REPRESENTATIVITY, FR_REGIONS, REGION_PAIRS,
 } from './config.js'
+
+// Région FR sélectionnée → objet de config régionalisé (défaut Bretagne).
+function frRegionOf(inputs) {
+  return FR_REGIONS[(inputs && inputs.frRegion) || 'bretagne'] || FR_REGIONS.bretagne
+}
 
 // ---------------------------------------------------------------------------
 //  Helpers génériques
@@ -291,10 +296,11 @@ export function computeCarUS({ profileKey, stateKey, creditScore, dtiRatePenalty
   }
 }
 
-/** Voiture FR : taux fixe, option transport en commun. */
-export function computeCarFR({ profileKey, useTransit }) {
+/** Voiture FR : taux fixe, option transport en commun. Régionalisé. */
+export function computeCarFR({ profileKey, useTransit, region }) {
+  const r = region || FR_REGIONS.bretagne
   if (useTransit) {
-    const map = { single: CAR.transitFR.annualSingle, couple: CAR.transitFR.annualCouple, family: CAR.transitFR.annualFamily }
+    const map = { single: r.transit.annualSingle, couple: r.transit.annualCouple, family: r.transit.annualFamily }
     // En report transport en commun : on garde éventuellement 1 véhicule pour la
     // famille (usage mixte) — simplifié : célib/couple = 0 voiture, famille = 1.
     if (profileKey === 'family') {
@@ -303,7 +309,7 @@ export function computeCarFR({ profileKey, useTransit }) {
     }
     return { vehicles: 0, total: map[profileKey], transit: map[profileKey] }
   }
-  const n = CAR.vehiclesFR[profileKey]
+  const n = r.vehicles[profileKey]
   return { vehicles: n, total: carFRperVehicle() * n, transit: 0 }
 }
 
@@ -337,22 +343,23 @@ export function computeEnergyUS({ profileKey, stateKey }) {
   return { kwh, elec, volatility, waterGas, total: elec + volatility + waterGas }
 }
 
-export function computeEnergyFR({ profileKey }) {
-  const kwh = ENERGY.elecKwhFR[profileKey]
-  const elec = kwh * ENERGY.elecPriceFR
-  const waterGas = ENERGY.waterGasAnnualFR[profileKey]
+export function computeEnergyFR({ profileKey, region }) {
+  const r = region || FR_REGIONS.bretagne
+  const kwh = r.elecKwh[profileKey]
+  const elec = kwh * ENERGY.elecPriceFR // prix du kWh NATIONAL (tarif réglementé)
+  const waterGas = r.waterGasAnnual[profileKey]
   return { kwh, elec, waterGas, total: elec + waterGas }
 }
 
 /** Logement US : crédit (taux ∝ credit score + DTI) + property tax + assurance + HOA. */
-export function computeHousingUS({ profileKey, stateKey, creditScore, climateRisk, housingMode, dtiRatePenalty = 0 }) {
+export function computeHousingUS({ profileKey, stateKey, creditScore, climateRisk, housingMode, dtiRatePenalty = 0, frPricePerM2 = HOUSING.pricePerM2FR }) {
   // housingMode : 'surface' (à surface égale) ou 'budget' (à budget égal vs FR).
   const surface = HOUSING.surfaceM2[profileKey]
   let value
   if (housingMode === 'budget') {
-    // À budget égal : on dépense le même montant qu'en France → la valeur du
-    // bien US correspond à ce budget FR converti. On calcule la surface obtenue.
-    const frValue = HOUSING.surfaceM2[profileKey] * HOUSING.pricePerM2FR
+    // À budget égal : on dépense le même montant qu'en France (région choisie) →
+    // la valeur du bien US correspond à ce budget FR converti.
+    const frValue = HOUSING.surfaceM2[profileKey] * frPricePerM2
     value = eurToUsd(frValue)
   } else {
     value = surface * HOUSING.pricePerM2US[stateKey]
@@ -375,17 +382,18 @@ export function computeHousingUS({ profileKey, stateKey, creditScore, climateRis
   }
 }
 
-export function computeHousingFR({ profileKey, housingMode }) {
+export function computeHousingFR({ profileKey, housingMode, region }) {
+  const r = region || FR_REGIONS.bretagne
   const surface = HOUSING.surfaceM2[profileKey]
-  const value = surface * HOUSING.pricePerM2FR
+  const value = surface * r.pricePerM2 // crédit à TAUX FIXE national, valeur régionalisée
   const principal = value * (1 - HOUSING.downPaymentRateFR)
   const monthly = monthlyPayment(principal, HOUSING.mortgageRateFR, HOUSING.loanTermYearsFR * 12)
   const creditAnnual = monthly * 12
-  const taxeFonciere = value * HOUSING.taxeFonciereRateFR
-  const insurance = HOUSING.homeInsuranceAnnualFR
+  const taxeFonciere = value * r.taxeFonciereRate
+  const insurance = r.homeInsuranceAnnual
   return {
     value, surface, rate: HOUSING.mortgageRateFR, creditAnnual, monthly,
-    taxeFonciere, insurance,
+    taxeFonciere, insurance, pricePerM2: r.pricePerM2,
     total: creditAnnual + taxeFonciere + insurance,
   }
 }
@@ -396,8 +404,9 @@ export function computeFoodUS({ profileKey }) {
   const withQuality = base * FOOD.qualityPremiumUS
   return { base, qualityPremium: withQuality - base, total: withQuality }
 }
-export function computeFoodFR({ profileKey }) {
-  return { total: FOOD.annualFR[profileKey] }
+export function computeFoodFR({ profileKey, region }) {
+  const r = region || FR_REGIONS.bretagne
+  return { total: FOOD.annualFR[profileKey] * r.foodMultiplier }
 }
 
 // ----- AXE 1 : dette étudiante de l'actif -----
@@ -735,14 +744,15 @@ export function computeSide(inputs, stateKey) {
     forcedUsGross: inputs.forcedUsGross * adults,
   })
 
-  // ----- FRANCE -----
-  const taxFR = computeTaxFR({ netAvantImpotFR: householdNet, profileKey })
-  const healthFR = computeHealthFR({ profileKey, healthScenario: inputs.healthScenario })
-  const carFR = computeCarFR({ profileKey, useTransit: inputs.useTransit })
-  const telecomFR = computeTelecomFR({ profileKey })
-  const energyFR = computeEnergyFR({ profileKey })
-  const housingFR = computeHousingFR({ profileKey, housingMode: inputs.housingMode })
-  const foodFR = computeFoodFR({ profileKey })
+  // ----- FRANCE ----- (régionalisée ; les prélèvements restent NATIONAUX)
+  const region = frRegionOf(inputs)
+  const taxFR = computeTaxFR({ netAvantImpotFR: householdNet, profileKey }) // national
+  const healthFR = computeHealthFR({ profileKey, healthScenario: inputs.healthScenario }) // national
+  const carFR = computeCarFR({ profileKey, useTransit: inputs.useTransit, region })
+  const telecomFR = computeTelecomFR({ profileKey }) // national
+  const energyFR = computeEnergyFR({ profileKey, region })
+  const housingFR = computeHousingFR({ profileKey, housingMode: inputs.housingMode, region })
+  const foodFR = computeFoodFR({ profileKey, region })
   const eduFR = computeEducationFR({
     profileKey,
     schoolChoice: inputs.schoolChoice,
@@ -792,7 +802,7 @@ export function computeSide(inputs, stateKey) {
   const carUS = computeCarUS({ profileKey, stateKey, creditScore: inputs.creditScore, dtiRatePenalty })
   const telecomUS = computeTelecomUS({ profileKey })
   const energyUS = computeEnergyUS({ profileKey, stateKey })
-  const housingUS = computeHousingUS({ profileKey, stateKey, creditScore: inputs.creditScore, climateRisk: inputs.climateRisk, housingMode: inputs.housingMode, dtiRatePenalty })
+  const housingUS = computeHousingUS({ profileKey, stateKey, creditScore: inputs.creditScore, climateRisk: inputs.climateRisk, housingMode: inputs.housingMode, dtiRatePenalty, frPricePerM2: region.pricePerM2 })
   const foodUS = computeFoodUS({ profileKey })
   const eduUS = computeEducationUS({
     profileKey, stateKey,
@@ -829,6 +839,7 @@ export function computeSide(inputs, stateKey) {
   return {
     salary,
     fr: {
+      regionKey: region.key,
       dispo: dispoFR,
       postes: postesFR,
       depensesContraintes: depensesContraintesFR,
@@ -850,15 +861,20 @@ export function computeSide(inputs, stateKey) {
   }
 }
 
-/** Calcule la France une fois + les 3 États US. */
+/** Calcule les 3 régions FR + les 3 États US. */
 export function computeAll(inputs) {
-  const fr = computeSide(inputs, 'TX').fr // la partie FR est indépendante de l'État
   const salary = computeSide(inputs, 'TX').salary
+  // FR pour les 3 régions (la partie FR est indépendante de l'État US).
+  const frRegions = {}
+  for (const regionKey of ['bretagne', 'metropole', 'idf']) {
+    frRegions[regionKey] = computeSide({ ...inputs, frRegion: regionKey }, 'TX').fr
+  }
+  const fr = frRegions[inputs.frRegion || 'bretagne'] // région sélectionnée
   const states = {}
   for (const stateKey of ['TX', 'NC', 'CA']) {
     states[stateKey] = computeSide(inputs, stateKey).us
   }
-  return { fr, salary, states }
+  return { fr, frRegions, salary, states, pairs: REGION_PAIRS }
 }
 
 // ===========================================================================
@@ -963,7 +979,14 @@ export function computeRepresentativity(inputs) {
   const employer = { ...R.employer[inputs.employerKey], key: inputs.employerKey }
   const creditScore = { ...R.creditScore[inputs.creditScore], key: inputs.creditScore }
   const healthPlan = { ...R.healthPlan[planKey], key: planKey, drivenBy: inputs.employerKey }
-  const transit = { ...R.transitFR, active: !!inputs.useTransit }
+  // Transport en commun : la représentativité dépend de la RÉGION FR.
+  const frRegion = FR_REGIONS[inputs.frRegion || 'bretagne'] || FR_REGIONS.bretagne
+  const transit = {
+    ...R.transitFR, active: !!inputs.useTransit,
+    share: frRegion.transitRepShare,
+    minority: frRegion.transitRepShare < R.minorityThreshold,
+    note: frRegion.transitNote,
+  }
   const retirement401k = { ...R.retirement401k }
   const healthScenario = {
     ...R.healthScenario,

@@ -43,8 +43,19 @@ export default function Methodology() {
         payés, congés maladie et maternité indemnisés — zéro garanti par la loi fédérale US)
         sont valorisables en équivalent monétaire.</p>
 
+        <p><strong>5. Symétrie géographique.</strong> La France n'est pas uniforme. On compare
+        <strong> trois territoires FR</strong> de niveaux de coût différents à <strong>trois
+        États US</strong> de niveaux différents, <strong>appariés par niveau</strong> : Bretagne
+        (province modérée) ↔ Texas ; métropole régionale (Lyon/Nantes/Toulouse) ↔ Caroline du
+        Nord ; Île-de-France/Paris ↔ Californie. Comparer la Bretagne à la Californie serait
+        aussi biaisé que comparer le Texas à Paris. Ce qui change selon la région : logement
+        (surtout), transport, voiture, énergie, alimentation. Ce qui <strong>ne change pas</strong> :
+        l'IR et les cotisations — la fiscalité FR est <strong>nationale</strong>, alors que
+        l'income tax US varie par État. Cette asymétrie est réelle et assumée, pas un bug.</p>
+
         <ul>
-          <li><strong>Référence FR</strong> : Bretagne, ville moyenne type Rennes.</li>
+          <li><strong>Archétypes FR</strong> : Bretagne/Rennes (low), métropole régionale (mid),
+          Île-de-France/Paris (high) — appariés aux 3 États US.</li>
           <li><strong>Archétypes US</strong> : Texas (low-cost, 0 % income tax), Caroline du
           Nord (médian), Californie (high-cost).</li>
           <li><strong>Mode propriétaire</strong> par défaut des deux côtés.</li>

@@ -53,10 +53,69 @@ export const CONVERSION = {
 //  ARCHÉTYPES D'ÉTATS US
 // ---------------------------------------------------------------------------
 export const STATES = {
-  TX: { key: 'TX', label: 'Texas', tagline: 'low-cost, 0 % income tax État' },
-  NC: { key: 'NC', label: 'Caroline du Nord', tagline: 'profil médian' },
-  CA: { key: 'CA', label: 'Californie', tagline: 'high-cost, fiscalité élevée' },
+  TX: { key: 'TX', label: 'Texas', tagline: 'low-cost, 0 % income tax État', level: 'low' },
+  NC: { key: 'NC', label: 'Caroline du Nord', tagline: 'profil médian', level: 'mid' },
+  CA: { key: 'CA', label: 'Californie', tagline: 'high-cost, fiscalité élevée', level: 'high' },
 }
+
+// ---------------------------------------------------------------------------
+//  ARCHÉTYPES DE RÉGIONS FR — symétriques des 3 États US (appariés par niveau)
+// ---------------------------------------------------------------------------
+//  La France n'est pas uniforme : opposer la seule Bretagne (province modérée)
+//  à des États US variés biaiserait en faveur de la FR, exactement comme
+//  brandir le Texas biaise en faveur des US. On régionalise donc les postes
+//  sensibles à la géographie. Les prélèvements (IR, cotisations) restent
+//  NATIONAUX — c'est une asymétrie RÉELLE avec les US (income tax par État),
+//  à afficher, pas à corriger.
+//  Une ville de référence par archétype (Rennes / Lyon / Paris).
+export const FR_REGIONS = {
+  bretagne: {
+    key: 'bretagne', label: 'Bretagne', tagline: 'province modérée (Rennes)', level: 'low', pairUS: 'TX',
+    pricePerM2: 3200,            // achat €/m² (Rennes)
+    taxeFonciereRate: 0.0045,
+    homeInsuranceAnnual: 280,
+    elecKwh: { single: 3000, couple: 4500, family: 6500 }, // maisons, isolation correcte
+    waterGasAnnual: { single: 600, couple: 950, family: 1400 },
+    foodMultiplier: 1.00,        // panier de référence
+    vehicles: { single: 1, couple: 1, family: 2 }, // forte dépendance auto (rural)
+    transit: { annualSingle: 420, annualCouple: 840, annualFamily: 1100 }, // après prise en charge 50 %
+    transitRepShare: 0.15,       // offre suffisante pour se passer de voiture : faible
+    transitNote: 'Bretagne hors Rennes : offre de transport en commun limitée, dépendance voiture forte (~15 % peuvent s\'en passer).',
+  },
+  metropole: {
+    key: 'metropole', label: 'Métropole régionale', tagline: 'Lyon / Nantes / Toulouse', level: 'mid', pairUS: 'NC',
+    pricePerM2: 4800,
+    taxeFonciereRate: 0.0055,
+    homeInsuranceAnnual: 340,
+    elecKwh: { single: 2800, couple: 4200, family: 6000 }, // logements un peu plus urbains
+    waterGasAnnual: { single: 620, couple: 980, family: 1450 },
+    foodMultiplier: 1.04,
+    vehicles: { single: 1, couple: 1, family: 1 }, // transit correct → un foyer peut limiter
+    transit: { annualSingle: 360, annualCouple: 720, annualFamily: 1000 },
+    transitRepShare: 0.45,
+    transitNote: 'Métropole régionale : réseau correct (métro/tram/bus). ~45 % peuvent se passer de voiture.',
+  },
+  idf: {
+    key: 'idf', label: 'Île-de-France', tagline: 'Paris (logement très cher)', level: 'high', pairUS: 'CA',
+    pricePerM2: 10000,           // Paris intra-muros
+    taxeFonciereRate: 0.0050,    // taux modéré mais valeurs élevées → taxe absolue forte
+    homeInsuranceAnnual: 420,    // dense urbain
+    elecKwh: { single: 2500, couple: 3700, family: 5200 }, // appartements plus petits
+    waterGasAnnual: { single: 650, couple: 1020, family: 1500 },
+    foodMultiplier: 1.12,        // prix sensiblement plus élevés
+    vehicles: { single: 0, couple: 1, family: 1 }, // Navigo → beaucoup s'en passent
+    transit: { annualSingle: 460, annualCouple: 920, annualFamily: 1150 }, // Navigo ~925 €/an − 50 % employeur
+    transitRepShare: 0.85,       // excellent réseau
+    transitNote: 'Île-de-France : réseau excellent (Navigo). ~85 % peuvent se passer de voiture.',
+  },
+}
+
+// Appariement recommandé par niveau de coût (low/mid/high).
+export const REGION_PAIRS = [
+  { region: 'bretagne', state: 'TX', level: 'low', label: 'Coût modéré' },
+  { region: 'metropole', state: 'NC', level: 'mid', label: 'Intermédiaire' },
+  { region: 'idf', state: 'CA', level: 'high', label: 'Coût élevé' },
+]
 
 // ---------------------------------------------------------------------------
 //  PROFILS DE FOYER

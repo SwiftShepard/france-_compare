@@ -1,5 +1,5 @@
 import React from 'react'
-import { PROFILES, EMPLOYER, STATES, SALARY } from '../config.js'
+import { PROFILES, EMPLOYER, STATES, SALARY, FR_REGIONS } from '../config.js'
 import {
   computeSalary, resolveNetAvantIRperAdult, computeRepresentativity,
   netAvantIRtoNetApresIR_household, netApresIRtoNetAvantIR_household,
@@ -171,6 +171,25 @@ export default function Controls({ inputs, set }) {
       <div className="panel">
         <div className="panel-head">Paramètres</div>
         <div className="panel-body">
+          <div className="field">
+            <label>
+              Région France <Info content={TOOLTIPS.frRegion} />
+            </label>
+            <Seg compact
+              value={inputs.frRegion}
+              onChange={(v) => set({ frRegion: v })}
+              options={[
+                { value: 'bretagne', label: 'Bretagne' },
+                { value: 'metropole', label: 'Métropole' },
+                { value: 'idf', label: 'IDF' },
+              ]}
+            />
+            <div className="hint">
+              {FR_REGIONS[inputs.frRegion].label} — {FR_REGIONS[inputs.frRegion].tagline}.
+              Apparié au niveau <b>{STATES[FR_REGIONS[inputs.frRegion].pairUS].label}</b> (même niveau de coût).
+            </div>
+          </div>
+
           <div className="field">
             <label>Profil de foyer</label>
             <Seg
